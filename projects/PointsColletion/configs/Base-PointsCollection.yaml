@@ -2,7 +2,7 @@ MODEL:
   META_ARCHITECTURE: "PointsCollection"
   MASK_ON: True
   BACKBONE:
-    NAME: "build_retinanet_resnet_fpn_backbone"
+    NAME: "build_points_collection_resnet_backbone"
   RESNETS:
     OUT_FEATURES: ["res3", "res4", "res5"]
     DEFORM_ON_PER_STAGE: [False, True, True, True] # on Res3,Res4,Res5
@@ -16,4 +16,4 @@ SOLVER:
   BASE_LR: 0.02
   STEPS: (60000, 80000)
   MAX_ITER: 90000
-VERSION: 2
+VERSION: 1.0
