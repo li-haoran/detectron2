@@ -174,6 +174,9 @@ class PointsCollection(nn.Module):
 
         # mask prediction
         loss_mask = 0
+        if num_fg<1:
+            losses= {"loss_cls": loss_cls, "loss_mask":loss_mask}
+            return losses
 
         pred_points_valids=pred_points[gt_belongs[:,0],:,gt_belongs[:,1],gt_belongs[:,2]]
 
@@ -203,7 +206,8 @@ class PointsCollection(nn.Module):
             
             # Inner=torch.tensor(Inner,dtype=torch.int64,device=self.device)
             # pred_points_valids_inner=pred_points_valids[:,Inner,:,:]
-        
+
+        # print(pred_points_valids_contour.size(),gt_masks.size())       
         l1_loss = torch.abs(pred_points_valids_contour - gt_masks)
         distance = torch.sum(l1_loss,dim=2)
         min_l1_loss,_=torch.min(distance,dim=2)
