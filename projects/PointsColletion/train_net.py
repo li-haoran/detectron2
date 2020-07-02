@@ -15,7 +15,7 @@ from detectron2.config import get_cfg
 from detectron2.engine import DefaultTrainer, default_argument_parser, default_setup, launch
 from detectron2.evaluation import COCOEvaluator, verify_results
 
-from tensormask import add_tensormask_config
+from pointscollection import add_pointscollection_config
 
 
 class Trainer(DefaultTrainer):
@@ -30,8 +30,8 @@ def setup(args):
     """
     Create configs and perform basic setups.
     """
-    cfg = get_cfg()
-    add_tensormask_config(cfg)
+    cfg = get_cfg()  
+    add_pointscollection_config(cfg)
     cfg.merge_from_file(args.config_file)
     cfg.merge_from_list(args.opts)
     cfg.freeze()

@@ -3,12 +3,12 @@ import cv2
 import numpy as np
 from scipy.interpolate import UnivariateSpline, interp1d
 
+import matplotlib.pyplot as plt
+
 
 class Targets:
     def __init__(self,cfg,pc_stride,cls_stride):
         
-        self.heatmap_style=cfg.MODEL.POINTS_COLLECTION.HT_STYLE
-        self.ratio=cfg.MODEL.POINTS_COLLECTION.RATIO
         self.pc_stride=pc_stride
         self.cls_stride=cls_stride
         self.num_class=cfg.MODEL.POINTS_COLLECTION.NUM_CLASSES
@@ -16,20 +16,27 @@ class Targets:
         self.contour=cfg.MODEL.POINTS_COLLECTION.CONTOUR
         assert self.pc_stride==self.cls_stride,"cls stride should be equal to pc's!"
 
-    def get_target_single(self,classes,bitmask):
-        bitmask=bitmask.cpu().numpy()
+    def get_target_single(self,classes,bitmask,output_size):
+        bitmask=bitmask.tensor.cpu().numpy()
         classes=classes.cpu().numpy()
-        N,H,W=bitmask.shape
+        N=classes.shape[0]
+        # print(classes)
 
-        H_out=H//self.cls_stride
-        W_out=W//self.cls_stride
+        H_out=output_size[2]
+        W_out=output_size[3]
         cls_target=np.zeros((self.num_class,H_out,W_out),dtype=np.float32)   
         
         offsets=[]
         belongs=[]
         for i in range(N):
             this_bitmask=bitmask[i]
-            center,count=self.fill_expand_polygon_center(this_bitmask)
+            center,count=self.fill_expand_polygon_center(np.uint8(this_bitmask))
+
+            # plt.imshow(this_bitmask)
+            # plt.scatter(count[:,0],count[:,1])
+            # plt.show()
+            # print(bitmask.shape)
+
             digit=classes[i]
 
             resize_center=center/self.cls_stride
@@ -37,7 +44,8 @@ class Targets:
             cls_target[digit],belong=self.generate_heatmap(cls_target[digit],resize_center)
             if belong.shape[0]>0:
                 resize_count=np.expand_dims(resize_count,0)
-                resize_count=np.repeat(resize_count,(belong.shape[0],1,1))
+                # print(resize_count.shape,belong.shape)
+                resize_count=np.tile(resize_count,(belong.shape[0],1,1))
                 belong_yx2xy=np.zeros_like(belong)
                 belong_yx2xy[:,0]=belong[:,1]
                 belong_yx2xy[:,1]=belong[:,0]
@@ -48,7 +56,7 @@ class Targets:
         
         pc_target_belongs=np.concatenate(belongs) if len(belongs)>0 else np.zeros((0,2),dtype=np.int64)
         # pc_target_belongs=np.int64(pc_target_belongs)
-        pc_target_offsets=np.concatenate(offsets) if len(offsets)>0 else np.zeros((0,self.contour),dtype=np.float32)
+        pc_target_offsets=np.concatenate(offsets) if len(offsets)>0 else np.zeros((0,self.contour,2),dtype=np.float32)
 
         return cls_target,pc_target_belongs,pc_target_offsets
 
@@ -68,10 +76,10 @@ class Targets:
         y = x[:, np.newaxis]
         x0 = y0 = size // 2
         g = np.exp(- ((x - x0) ** 2 + (y - y0) ** 2) / (2 * self.sigma ** 2))
-        g_x = max(0, -ul[0]), min(br[0], h) - ul[0]
-        g_y = max(0, -ul[1]), min(br[1], w) - ul[1]
-        img_x = max(0, ul[0]), min(br[0], h)
-        img_y = max(0, ul[1]), min(br[1], w)
+        g_x = max(0, -ul[0]), min(br[0], w) - ul[0]
+        g_y = max(0, -ul[1]), min(br[1], h) - ul[1]
+        img_x = max(0, ul[0]), min(br[0], w)
+        img_y = max(0, ul[1]), min(br[1], h)
         heatmap[img_y[0]:img_y[1], img_x[0]:img_x[1]] = np.maximum(
             heatmap[img_y[0]:img_y[1], img_x[0]:img_x[1]],
             g[g_y[0]:g_y[1], g_x[0]:g_x[1]])
@@ -119,9 +127,18 @@ class Targets:
         #make count has the same length
         new_count=np.zeros((self.contour,2),dtype=np.float32)
         length=count.shape[0]
+        if length<2:
+            # print(contour)
+            # plt.imshow(bitmask)
+            # plt.scatter(count[:,0],count[:,1])
+            # plt.show()
+            new_count[:,0]=count[0,0]
+            new_count[:,1]=count[0,1]
+            return np.array(center)
         interval=1.0*(length-1)/(self.contour-1)    
         z=[x*interval for x in range(self.contour)]
         z_org=range(length)
+        # print(count.shape)
         interx=interp1d(z_org,count[:,0],bounds_error=False,fill_value="extrapolate")
         newx=interx(z)
         intery=interp1d(z_org,count[:,1],bounds_error=False,fill_value="extrapolate")
@@ -129,7 +146,7 @@ class Targets:
         new_count[:,0]=newx
         new_count[:,1]=newy
       
-        return center,new_count
+        return np.array(center),new_count
 
 
 

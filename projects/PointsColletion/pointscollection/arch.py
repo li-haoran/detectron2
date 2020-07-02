@@ -5,11 +5,11 @@ import math
 from typing import List
 import torch
 import torch.nn.functional as F
-from fvcore.nn import sigmoid_focal_loss_star_jit, smooth_l1_loss
+from fvcore.nn import sigmoid_focal_loss, smooth_l1_loss
 from torch import nn
 import numpy as np
 
-from detectron2.layers import ShapeSpec, cat,
+from detectron2.layers import ShapeSpec, cat
 from detectron2.modeling.backbone import build_backbone
 from detectron2.modeling.meta_arch.build import META_ARCH_REGISTRY
 
@@ -17,7 +17,7 @@ from detectron2.structures import Boxes, ImageList, Instances
 from detectron2.utils.logger import log_first_n
 
 from pointscollection.head import PointsCollectionHead,ClsHead
-from pointscollection.data import Targets,points_to_masks,_postprocess
+from pointscollection.data import Targets,_postprocess
 
 
 
@@ -50,7 +50,7 @@ class PointsCollection(nn.Module):
 
         backbone_shape = self.backbone.output_shape()
         classify_feature_shapes = [backbone_shape[f] for f in self.cin_features]
-        classify_feature_strides = [x.stride for x in classify_feature_shapes]
+        self.classify_feature_strides = [x.stride for x in classify_feature_shapes]
 
         assert len(classify_feature_shapes)==1,'here just use final output'
         points_feature_shapes=[backbone_shape[f] for f in self.pin_features]
@@ -59,7 +59,7 @@ class PointsCollection(nn.Module):
         self.pc_head=PointsCollectionHead(cfg,points_feature_shapes)
         self.cls_head=ClsHead(cfg,classify_feature_shapes)
 
-        self.target_generator=Targets(cfg,points_feature_strides[-1],classify_feature_strides[-1])
+        self.target_generator=Targets(cfg,self.points_feature_strides[-1],self.classify_feature_strides[-1])
         self.register_buffer("pixel_mean", torch.Tensor(cfg.MODEL.PIXEL_MEAN).view(-1, 1, 1))
         self.register_buffer("pixel_std", torch.Tensor(cfg.MODEL.PIXEL_STD).view(-1, 1, 1))
 
@@ -93,17 +93,23 @@ class PointsCollection(nn.Module):
         else:
             gt_instances = None
 
+        # print(images.image_sizes)
+        # print(images.tensor.size())
         features = self.backbone(images.tensor)
         classify_features = [features[f][0] for f in self.cin_features]
         points_features =[features[f][1] for f in self.pin_features]
         # apply the head
+        # print(classify_features[0].size())
 
+        pf_b,pf_c,pf_h,pf_w=points_features[-1].size()
+        target_points=points_features[-1].new_zeros(pf_b,2,pf_h,pf_w,requires_grad=False)
         pred_digits=self.cls_head(classify_features)
-        pred_points=self.pc_head(points_features)
+        pred_points=self.pc_head(target_points,points_features)
 
         if self.training:
             # get ground truths for class labels and box targets, it will label each anchor
-            gt_clses, gt_belongs, gt_masks, = self.get_ground_truth(gt_instances)
+            output_size=classify_features[-1].size()
+            gt_clses, gt_belongs, gt_masks, = self.get_ground_truth(gt_instances,output_size)
             # compute the loss
             return self.losses(
                 gt_clses,
@@ -148,11 +154,12 @@ class PointsCollection(nn.Module):
                 "loss_cls", and "loss_mask".
         """
         num_fg=gt_belongs.size(0)
+        # print(num_fg,torch.sum(gt_clses))
         loss_normalizer = torch.tensor(max(1, num_fg), dtype=torch.float32, device=self.device)
 
         # classification
         loss_cls = (
-            sigmoid_focal_loss_star_jit(
+            sigmoid_focal_loss(
                 pred_logits,
                 gt_clses,
                 alpha=self.focal_loss_alpha,
@@ -174,7 +181,7 @@ class PointsCollection(nn.Module):
         pred_points_valids=pred_points_valids.view(N,P//2,2,1)
 
         Q=gt_masks.size(1)
-        gt_masks=gt_masks.view(N,1,Q//2,2)
+        gt_masks=gt_masks.view(N,1,Q,2)
         gt_masks=gt_masks.transpose(2,3)
 
         pred_points_valids_contour=pred_points_valids
@@ -199,21 +206,22 @@ class PointsCollection(nn.Module):
         
         l1_loss = torch.abs(pred_points_valids_contour - gt_masks)
         distance = torch.sum(l1_loss,dim=2)
-        min_l1_loss=torch.min(distance,dim=2)
+        min_l1_loss,_=torch.min(distance,dim=2)
 
         loss_mask=torch.mean(min_l1_loss)*self.mask_loss_weight
         
-        losses["loss_mask"] = loss_mask / loss_normalizer
+        losses["loss_mask"] = loss_mask
         return losses
 
     @torch.no_grad()
-    def get_ground_truth(self, targets):
+    def get_ground_truth(self, targets,output_size):
         """
         Args:
 
             targets (list[Instances]): a list of N `Instances`s. The i-th
                 `Instances` contains the ground-truth per-instance annotations
                 for the i-th input image.  Specify `targets` during training only.
+            output_size: the output featuremap size.
 
         Returns:
             gt_clses:   b x c x h x w tensor
@@ -226,24 +234,24 @@ class PointsCollection(nn.Module):
         for it,target_im in enumerate(targets):
             classes=target_im.gt_classes
             masks=target_im.gt_masks       
-            gt_cls,gt_belong,gt_mask=self.target_generator.get_target_single(classes,masks)
+            gt_cls,gt_belong,gt_mask=self.target_generator.get_target_single(classes,masks,output_size)
 
-            batch_index=np.zeros((gt_belong.shape[0],),dtype=np.int64)+it
-            gt_belong_batch=np.concatenate([batch_index,gt_belong])
+            batch_index=np.zeros((gt_belong.shape[0],1),dtype=np.int64)+it
+            gt_belong_batch=np.concatenate([batch_index,gt_belong],axis=1)
 
             gt_clses.append(gt_cls)
             gt_belongs.append(gt_belong_batch)
             gt_masks.append(gt_mask)
 
         gt_clses=np.stack(gt_clses)
-        gt_clses=torch.from_numpy(gt_clses,device=self.device)
+        gt_clses=torch.from_numpy(gt_clses).to(device=self.device)
 
         gt_clses_binary=torch.tensor(gt_clses>0,dtype=torch.float32,device=self.device)
         
         gt_belongs=np.concatenate(gt_belongs)
-        gt_belongs=torch.from_numpy(gt_belongs,device=self.device)
-        gt_masks=np.stack(gt_masks)
-        gt_masks=torch.from_numpy(gt_masks,device=self.device)
+        gt_belongs=torch.from_numpy(gt_belongs).to(device=self.device)
+        gt_masks=np.concatenate(gt_masks)
+        gt_masks=torch.from_numpy(gt_masks).to(device=self.device)
 
         return [gt_clses_binary,gt_belongs,gt_masks]
        

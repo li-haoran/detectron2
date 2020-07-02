@@ -7,16 +7,16 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from detectron2.layers import Conv2d, FrozenBatchNorm2d, get_norm,CNNBlockBase
-from detectron2.modeling import BACKBONE_REGISTRY, ResNet, ResNetBlockBase, make_stage
+from detectron2.modeling import BACKBONE_REGISTRY, ResNet, ResNetBlockBase
 from detectron2.modeling.backbone.resnet import BasicStem, BottleneckBlock,DeformBottleneckBlock
 
 
 
-__all__ = [ "build_points_collection_resnet_backbone"]
+__all__ = [ "build_points_collection_resnet_backbone","DeformbleOffsetBottleneckBlock","ResNet2"]
 
 class DeformbleOffsetBottleneckBlock(DeformBottleneckBlock):
-    def __init__(self, in_channels, out_channels, *, bottleneck_channels, stride=1, num_groups=1, norm='BN', stride_in_1x1=False, dilation=1, deform_modulated=False, deform_num_groups=1):
-        super(DeformbleOffsetBottleneckBlock,self).__init__(in_channels, out_channels, *, bottleneck_channels, stride=stride, num_groups=num_groups, norm=norm, stride_in_1x1=stride_in_1x1, dilation=dilation, deform_modulated=deform_modulated, deform_num_groups=deform_num_groups)
+    def __init__(self, in_channels, out_channels, *,bottleneck_channels, stride=1, num_groups=1, norm='BN', stride_in_1x1=False, dilation=1, deform_modulated=False, deform_num_groups=1):
+        super(DeformbleOffsetBottleneckBlock,self).__init__(in_channels, out_channels, bottleneck_channels=bottleneck_channels, stride=stride, num_groups=num_groups, norm=norm, stride_in_1x1=stride_in_1x1, dilation=dilation, deform_modulated=deform_modulated, deform_num_groups=deform_num_groups)
 
     def forward(self, x):
         out = self.conv1(x)
@@ -72,7 +72,7 @@ class ResNet2(ResNet):
             x = stage(x)
             if name in self._out_features:
                 outputs[name] = x
-            if isinstance(x,list):
+            if isinstance(x,tuple):
                 x,_=x
         if self.num_classes is not None:
             x = self.avgpool(x)
@@ -81,8 +81,41 @@ class ResNet2(ResNet):
             if "linear" in self._out_features:
                 outputs["linear"] = x
         return outputs
+    @staticmethod
+    def make_stage(block_class, num_blocks, block_info, first_stride,*, in_channels, out_channels,norm,**kwargs):
+            """
+            Create a list of blocks of the same type that forms one ResNet stage.
+            Layers that produce the same feature map spatial size are defined as one
+            "stage" by :paper:`FPN`.
 
-        
+            Args:
+                block_class (type): a subclass of CNNBlockBase that's used to create all blocks in this
+                    stage. A module of this type must not change spatial resolution of inputs unless its
+                    stride != 1.
+                num_blocks (int): number of blocks in this stage
+                first_stride (int): the stride of the first block. The other blocks will have stride=1.
+                    Therefore this is also the stride of the entire stage.
+                in_channels (int): input channels of the entire stage.
+                out_channels (int): output channels of **every block** in the stage.
+                kwargs: other arguments passed to the constructor of `block_class`.
+
+            Returns:
+                list[nn.Module]: a list of block module.
+            """
+            assert "stride" not in kwargs, "Stride of blocks in make_stage cannot be changed."
+            blocks = []
+            for i in range(num_blocks):
+                blocks.append(
+                    block_class[i](
+                        in_channels=in_channels,
+                        out_channels=out_channels,
+                        stride=first_stride if i == 0 else 1,
+                        norm=norm,
+                        **block_info[i],
+                    )
+                )
+                in_channels = out_channels
+            return blocks
 
 
 @BACKBONE_REGISTRY.register()
@@ -151,17 +184,25 @@ def build_points_collection_resnet_backbone(cfg, input_shape):
             "norm": norm,
         }
         
-        stage_kargs["block_class"] = BottleneckBlock
-        stage_kargs["bottleneck_channels"] = bottleneck_channels
-        stage_kargs["stride_in_1x1"] = stride_in_1x1
-        stage_kargs["dilation"] = dilation
-        stage_kargs["num_groups"] = num_groups
-        if deform_on_per_stage[idx]:
-            stage_kargs["block_class"] = DeformbleOffsetBottleneckBlock
-            stage_kargs["deform_modulated"] = deform_modulated
-            stage_kargs["deform_num_groups"] = deform_num_groups
+        block_info=[]
+        block_class=[]
+        for i in range(num_blocks_per_stage[idx]):
+            k={}          
+            k["bottleneck_channels"] = bottleneck_channels
+            k["stride_in_1x1"] = stride_in_1x1
+            k["dilation"] = dilation
+            k["num_groups"] = num_groups
+            if deform_on_per_stage[idx] and (i==num_blocks_per_stage[idx]-1):
+                block_class.append(DeformbleOffsetBottleneckBlock)
+                k["deform_modulated"] = deform_modulated
+                k["deform_num_groups"] = deform_num_groups
+            else:
+                block_class.append(BottleneckBlock)
+            block_info.append(k)
+        stage_kargs['block_info']=block_info
+        stage_kargs['block_class']=block_class
 
-        blocks = make_stage(**stage_kargs)
+        blocks = ResNet2.make_stage(**stage_kargs)
         in_channels = out_channels
         out_channels *= 2
         bottleneck_channels *= 2

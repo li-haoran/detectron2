@@ -28,19 +28,19 @@ void offsetAccumulate_col2im_coord(const at::Tensor grad_output,  const at::Tens
 
 void shape_check(at::Tensor target_offset, at::Tensor dcn_offset)
 {
-  AT_CHECK(target_offset.ndimension() == 4,
+  TORCH_CHECK(target_offset.ndimension() == 4,
            "4D target_offset tensor (b,c,H,W) expected, "
            "but got: %s",
            target_offset.ndimension());
 
-  AT_CHECK(target_offset.is_contiguous(), "target_offset tensor has to be contiguous");
+  TORCH_CHECK(target_offset.is_contiguous(), "target_offset tensor has to be contiguous");
 
-  AT_CHECK(dcn_offset.ndimension() == 4,
+  TORCH_CHECK(dcn_offset.ndimension() == 4,
            "4D target_offset tensor (b,c,H,W) expected, "
            "but got: %s",
            dcn_offset.ndimension());
 
-  AT_CHECK(dcn_offset.is_contiguous(), "dcn_offset tensor has to be contiguous");
+  TORCH_CHECK(dcn_offset.is_contiguous(), "dcn_offset tensor has to be contiguous");
 }
 
 void points_collect_forward_cuda(at::Tensor target_offset, at::Tensor dcn_offset, at::Tensor output)
@@ -91,8 +91,8 @@ void points_collect_backward_cuda(
     at::Tensor grad_target_offset, at::Tensor grad_dcn_offset,
     at::Tensor grad_output)
 {
-  AT_CHECK(target_offset.is_contiguous(), "target_offset tensor has to be contiguous");
-  AT_CHECK(dcn_offset.is_contiguous(), "dcn_offset tensor has to be contiguous");
+  TORCH_CHECK(target_offset.is_contiguous(), "target_offset tensor has to be contiguous");
+  TORCH_CHECK(dcn_offset.is_contiguous(), "dcn_offset tensor has to be contiguous");
 
   const int batch = target_offset.size(0);
   const int num_target = target_offset.size(1)/2;

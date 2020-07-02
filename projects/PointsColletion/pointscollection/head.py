@@ -20,7 +20,7 @@ class PointsCollectionHead(nn.Module):
 
         self.output_channels=self.points_size*2
 
-    def forward(self, *input):
+    def forward(self, target_offset,dcn_offsets):
         '''
         input:
             [['res3','res4',res5'],'target']
@@ -29,9 +29,9 @@ class PointsCollectionHead(nn.Module):
             target
 
         '''
-        target_offset=input[-1]
         
-        dcn_offsets=[input[0] for i in range(len(input)-1,-1,-1)]
+        
+        dcn_offsets=[dcn_offsets[i] for i in range(len(dcn_offsets)-1,-1,-1)]
         for m,dcn_offset in zip(self.pc,dcn_offsets):
             target_offset=m(target_offset,dcn_offset)
 

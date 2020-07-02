@@ -30,9 +30,6 @@ class PointsCollectFunction(Function):
            
             assert (target_offset.size(1) % 2) == 0, 'target_offset channels must be even number'
             assert (dcn_offset.size(1) % 2) == 0, 'dcn_offset channels must be even number'
-            assert target_offset.size(2) == dcn_offset.size(2), 'both sizes must be equal'
-
-
             points_collect_cuda.points_collect_forward_cuda(
                 target_offset,dcn_offset, output)
         return output
@@ -58,8 +55,8 @@ class PointsCollectFunction(Function):
     @staticmethod
     def _output_size(target_offset,dcn_offset):
 
-        b,c,h,w=dcn_offset.size()
-        c1=target_offset.size(1)//2
+        b,c,h,w=target_offset.size()
+        c1=dcn_offset.size(1)//2
         
         output_size = (b,c*c1,h,w)
         return output_size
