@@ -250,12 +250,18 @@ class PointsCollection(nn.Module):
         gt_clses=np.stack(gt_clses)
         gt_clses=torch.from_numpy(gt_clses).to(device=self.device)
 
-        gt_clses_binary=torch.tensor(gt_clses>0,dtype=torch.float32,device=self.device)
+        gt_clses_binary=torch.tensor(gt_clses.clone().detach()>0,dtype=torch.float32,device=self.device)
         
         gt_belongs=np.concatenate(gt_belongs)
         gt_belongs=torch.from_numpy(gt_belongs).to(device=self.device)
         gt_masks=np.concatenate(gt_masks)
         gt_masks=torch.from_numpy(gt_masks).to(device=self.device)
+
+        N=gt_belongs.size(0)
+        if N>1024:
+            index=torch.randperm(N)[:1024]
+            gt_masks=gt_masks[index,:,:]
+            gt_belongs=gt_belongs[index,:]
 
         return [gt_clses_binary,gt_belongs,gt_masks]
        
@@ -299,22 +305,22 @@ class PointsCollection(nn.Module):
             center=center.view(N,1,2)
             
             points_n = points_im[:,Index[:,1],Index[:,2]]
-            npoints=torch.transpose(points_n)
+            npoints=torch.transpose(points_n,1,0)
             npoints=npoints.view(N,-1,2)
 
             real_npoints=npoints+center
 
             real_npoints=real_npoints*self.points_feature_strides[-1]
 
-            top_left=torch.min(real_npoints,dim=1)
-            bottom_right=torch.max(real_npoints,dim=1)
+            top_left,_=torch.min(real_npoints,dim=1)
+            bottom_right,_=torch.max(real_npoints,dim=1)
 
             bbox=torch.cat([top_left,bottom_right],dim=1)
 
             results_im.pred_classes = cls_idxs
-            results.pred_boxes = Boxes(bbox)
-            results.scores = pred_prob
-            results.pred_points=real_npoints          
+            results_im.pred_boxes = Boxes(bbox)
+            results_im.scores = pred_prob
+            results_im.pred_points=real_npoints          
             results.append(results_im)
         return results
 

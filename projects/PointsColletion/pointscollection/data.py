@@ -2,6 +2,7 @@ import torch
 import cv2
 import numpy as np
 from scipy.interpolate import UnivariateSpline, interp1d
+from detectron2.structures import Boxes,Instances
 
 import matplotlib.pyplot as plt
 
@@ -63,7 +64,7 @@ class Targets:
 
 
     def generate_heatmap(self,heatmap,center):
-        tmp_size = self.sigma * 3
+        tmp_size = self.sigma
         mu_x = int(center[0] + 0.5)
         mu_y = int(center[1] + 0.5)
         h, w = heatmap.shape[0], heatmap.shape[1]
@@ -134,7 +135,7 @@ class Targets:
             # plt.show()
             new_count[:,0]=count[0,0]
             new_count[:,1]=count[0,1]
-            return np.array(center)
+            return np.array(center),new_count
         interval=1.0*(length-1)/(self.contour-1)    
         z=[x*interval for x in range(self.contour)]
         z_org=range(length)
@@ -182,9 +183,11 @@ def _postprocess(results, output_height, output_width,):
     output_boxes.clip(results.image_size)
 
     pred_points=results.pred_points
-    pred_points.tensor[:,:, 0] *= scale_x
-    pred_points.tensor[:,:, 1] *= scale_y
-    pred_points.clip(results.image_size)
+    pred_points[:,:, 0] *= scale_x
+    pred_points[:,:, 1] *= scale_y
+    h,w=results.image_size
+    pred_points[:,:, 0].clamp_(min=0, max=w)
+    pred_points[:,:, 1].clamp_(min=0, max=h)
 
     pred_masks=points_to_masks(pred_points,results.image_size)
 
@@ -203,7 +206,7 @@ def points_to_masks(pred_points,image_size):
         contour=cv2.convexHull(points)
         img=np.zeros(image_size,np.uint8)
         mask=cv2.fillPoly(img, [contour[:,0,:]], (255))
-        mask=torch.from_numpy(mask,device=pred_points.device)
+        mask=torch.from_numpy(mask).to(device=pred_points.device)
         mask=(mask>0).to(dtype=torch.bool)
         masks.append(mask)
 
