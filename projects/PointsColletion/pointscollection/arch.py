@@ -12,6 +12,8 @@ import numpy as np
 from detectron2.layers import ShapeSpec, cat
 from detectron2.modeling.backbone import build_backbone
 from detectron2.modeling.meta_arch.build import META_ARCH_REGISTRY
+from detectron2.modeling.postprocessing import detector_postprocess
+from detectron2.utils.events import get_event_storage
 
 from detectron2.structures import Boxes, ImageList, Instances
 from detectron2.utils.logger import log_first_n
@@ -19,6 +21,7 @@ from detectron2.utils.logger import log_first_n
 from pointscollection.head import PointsCollectionHead,ClsHead
 from pointscollection.data import Targets,_postprocess
 
+import matplotlib.pyplot as plt
 
 
 @META_ARCH_REGISTRY.register()
@@ -66,6 +69,62 @@ class PointsCollection(nn.Module):
     @property
     def device(self):
         return self.pixel_mean.device
+
+    def visualize_training(self,batched_inputs, results):#image,heatmap):#,
+        """
+        A function used to visualize ground truth images and final network predictions.
+        It shows ground truth bounding boxes on the original image and up to 20
+        predicted object bounding boxes on the original image.
+
+        Args:
+            batched_inputs (list): a list that contains input to the model.
+            results (List[Instances]): a list of #images elements.
+        """
+        from detectron2.utils.visualizer import Visualizer
+        from detectron2.data.detection_utils import convert_image_to_rgb
+
+
+        assert len(batched_inputs) == len(
+            results
+        ), "Cannot visualize inputs and results of different sizes"
+        # storage = get_event_storage()
+        max_boxes = 1024
+
+        image_index = 0  # only visualize a single image
+        img = batched_inputs[image_index]["image"]
+        img = convert_image_to_rgb(img.permute(1, 2, 0), "BGR")
+
+
+        # v_gt = Visualizer(img, None)
+        # # v_gt = v_gt.overlay_instances(boxes=batched_inputs[image_index]["instances"].gt_boxes)
+        # anno_img = v_gt.get_image()
+        processed_results = detector_postprocess(results[image_index], img.shape[0], img.shape[1])
+        predicted_boxes = processed_results.pred_boxes.tensor.detach().cpu().numpy()
+        # predicted_mask = processed_results.pred_masks.detach().cpu().numpy()
+
+        v_pred = Visualizer(img, None)
+        v_pred = v_pred.overlay_instances(boxes=predicted_boxes[0:max_boxes],)
+        prop_img = v_pred.get_image()
+        vis_img =prop_img# np.vstack((anno_img, prop_img))
+        # vis_img = vis_img.transpose(2, 0, 1)
+        # vis_name = f"Top: GT bounding boxes; Bottom: {max_boxes} Highest Scoring Results"
+        plt.imshow(vis_img)
+        plt.show()
+
+        # storage.put_image(vis_name, vis_img)
+        # img = image[0]
+        # img=img*self.pixel_std+self.pixel_mean
+        # img = convert_image_to_rgb(img.permute(1, 2, 0), "BGR")
+        # ht=heatmap[0]
+        # ht=torch.sigmoid(ht)
+
+        # ht=ht.cpu().numpy()
+        # ht=np.max(ht,axis=0)
+        # plt.imshow(np.uint8(img))
+        # plt.show()
+        # plt.imshow(ht)
+        # plt.show()
+
 
     def forward(self, batched_inputs):
         """
@@ -121,6 +180,7 @@ class PointsCollection(nn.Module):
         else:
             # do inference to get the output
             results = self.inference(pred_digits, pred_points,images)
+            self.visualize_training(batched_inputs,results)
             processed_results = []
             for results_im, input_im, image_size in zip(
                 results, batched_inputs, images.image_sizes
@@ -128,6 +188,7 @@ class PointsCollection(nn.Module):
                 height = input_im.get("height", image_size[0])
                 width = input_im.get("width", image_size[1])
                 # this is to do post-processing with the image size
+                # print(height,width,image_size)
                 result= results_im
                 r = _postprocess(result,height, width)
                 processed_results.append({"instances": r})
@@ -289,25 +350,41 @@ class PointsCollection(nn.Module):
             digits_im = pred_digits[img_idx]
             pool_digits_im=pred_digits[img_idx]
             points_im=pred_points[img_idx]
+            # print(points_im[:,15,15].view(-1,2).cpu().numpy())
 
             Index=torch.nonzero((digits_im==pool_digits_im) & (digits_im>self.score_threshold))
 
             results_im=Instances(image_size)
             if Index.size(0)<1:
+                results.append(results_im)
                 continue
-
+                
             cls_idxs=Index[:,0]
             pred_prob=digits_im[Index[:,0],Index[:,1],Index[:,2]]
 
             center=torch.cat([Index[:,2:3],Index[:,1:2]],dim=1)
+            points_n_yx = points_im[:,Index[:,1],Index[:,2]]
+            points_n=points_n_yx.clone().detach()
+            points_n[::2]=points_n_yx[1::2]
+            points_n[1::2]=points_n_yx[::2]
+            print(points_n,points_n.size())
 
             N=center.size(0)
-            center=center.view(N,1,2)
+            # print(N)
+            if N>1024:
+                pred_prob, topk_idxs = pred_prob.sort(descending=True)
+                # Keep top k scoring values
+                pred_prob = pred_prob[:1024]
+                # Keep top k values
+                center = center[topk_idxs[:1024],:]
+                points_n = points_n[:,topk_idxs[:1024]]
+                cls_idxs=cls_idxs[topk_idxs[:1024]]
+                N=1024
             
-            points_n = points_im[:,Index[:,1],Index[:,2]]
+            center=center.view(N,1,2)
+                       
             npoints=torch.transpose(points_n,1,0)
             npoints=npoints.view(N,-1,2)
-
             real_npoints=npoints+center
 
             real_npoints=real_npoints*self.points_feature_strides[-1]
@@ -316,6 +393,7 @@ class PointsCollection(nn.Module):
             bottom_right,_=torch.max(real_npoints,dim=1)
 
             bbox=torch.cat([top_left,bottom_right],dim=1)
+            print(center,bbox)
 
             results_im.pred_classes = cls_idxs
             results_im.pred_boxes = Boxes(bbox)

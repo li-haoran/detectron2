@@ -27,8 +27,7 @@ class PointsCollectPack(nn.Module):
         grid=torch.stack(grid,dim=2)
 
         grid=grid.view(1,self.kernel_size[1]*self.kernel_size[0]*2,1,1)
-        self.anchor = nn.Parameter(grid,requires_grad=False)
-
+        self.register_buffer('anchor',grid)
 
 
     def forward(self, target_offset, dcn_offset):
