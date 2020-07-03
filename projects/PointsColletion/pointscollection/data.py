@@ -37,6 +37,7 @@ class Targets:
             # plt.scatter(count[:,0],count[:,1])
             # plt.show()
             # print(bitmask.shape)
+            # print(count,self.pc_stride)
 
             digit=classes[i]
 
@@ -47,11 +48,12 @@ class Targets:
                 resize_count=np.expand_dims(resize_count,0)
                 # print(resize_count.shape,belong.shape)
                 resize_count_xy2yx=np.zeros_like(resize_count)
-                resize_count_xy2yx[:,0]=resize_count[:,1]
-                resize_count_xy2yx[:,1]=resize_count[:,0]
+                resize_count_xy2yx[0,:,0]=resize_count[0,:,1]
+                resize_count_xy2yx[0,:,1]=resize_count[0,:,0]
                 resize_count_xy2yx=np.tile(resize_count_xy2yx,(belong.shape[0],1,1))
                 expand_belong=np.expand_dims(belong,1)
                 offset=resize_count_xy2yx-expand_belong
+                # print(offset,belong,list(resize_count_xy2yx[0]))
                 offsets.append(offset)
                 belongs.append(belong)
         

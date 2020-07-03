@@ -236,7 +236,7 @@ class PointsCollection(nn.Module):
         # mask prediction
         loss_mask = 0
         if num_fg<1:
-            losses= {"loss_cls": loss_cls, "loss_mask":loss_mask}
+            losses= {"loss_cls": loss_cls, "loss_mask":torch.sum(pred_points*0)}
             return losses
 
         pred_points_valids=pred_points[gt_belongs[:,0],:,gt_belongs[:,1],gt_belongs[:,2]]
