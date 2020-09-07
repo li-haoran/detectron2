@@ -1,0 +1,12 @@
+_BASE_: "Base-PointsCollection.yaml"
+MODEL:
+  WEIGHTS: "detectron2://ImageNetPretrained/MSRA/R-50.pkl"
+  RESNETS:
+    DEPTH: 50
+SOLVER:
+  BASE_LR: 0.002
+  STEPS: (480000, 520000)
+  MAX_ITER: 540000
+INPUT:
+  MIN_SIZE_TRAIN_SAMPLING: "range"
+  MIN_SIZE_TRAIN: (640, 800)

@@ -180,6 +180,8 @@ class PointsCollection(nn.Module):
         else:
             # do inference to get the output
             results = self.inference(pred_digits, pred_points,images)
+            plt.imshow(np.max(pred_digits[0].cpu().numpy(),0))
+            plt.show()
             self.visualize_training(batched_inputs,results)
             processed_results = []
             for results_im, input_im, image_size in zip(
@@ -365,8 +367,8 @@ class PointsCollection(nn.Module):
             center=torch.cat([Index[:,2:3],Index[:,1:2]],dim=1)
             points_n_yx = points_im[:,Index[:,1],Index[:,2]]
             points_n=points_n_yx.clone().detach()
-            points_n[::2]=points_n_yx[1::2]
-            points_n[1::2]=points_n_yx[::2]
+            points_n[::2,:]=points_n_yx[1::2,:]
+            points_n[1::2,:]=points_n_yx[::2,:]
             print(points_n,points_n.size())
 
             N=center.size(0)
@@ -393,7 +395,7 @@ class PointsCollection(nn.Module):
             bottom_right,_=torch.max(real_npoints,dim=1)
 
             bbox=torch.cat([top_left,bottom_right],dim=1)
-            print(center,bbox)
+            print(pred_prob,center,bbox)
 
             results_im.pred_classes = cls_idxs
             results_im.pred_boxes = Boxes(bbox)
