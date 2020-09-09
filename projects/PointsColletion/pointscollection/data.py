@@ -43,7 +43,7 @@ class Targets:
 
             resize_center=center/self.cls_stride
             resize_count=count/self.pc_stride
-            cls_target[digit],belong=self.generate_heatmap(cls_target[digit],resize_center)
+            cls_target[digit],belong=self.generate_onehot(cls_target[digit],resize_center)
             if belong.shape[0]>0:
                 resize_count=np.expand_dims(resize_count,0)
                 # print(resize_count.shape,belong.shape)
@@ -87,15 +87,25 @@ class Targets:
             heatmap[img_y[0]:img_y[1], img_x[0]:img_x[1]],
             g[g_y[0]:g_y[1], g_x[0]:g_x[1]])
 
-        # belongs=np.argwhere(heatmap[img_y[0]:img_y[1], img_x[0]:img_x[1]]==g[g_y[0]:g_y[1], g_x[0]:g_x[1]])
-        # if belongs.shape[0]>0:
-        #     belongs[:,0]+=img_y[0]
-        #     belongs[:,1]+=img_x[0]
-        # one hot center 
-        belongs=np.zeros((1,2),dtype=np.int64)
-        belongs[0,0]=mu_y
-        belongs[0,1]=mu_x
+        belongs=np.argwhere(heatmap[img_y[0]:img_y[1], img_x[0]:img_x[1]]==g[g_y[0]:g_y[1], g_x[0]:g_x[1]])
+        if belongs.shape[0]>0:
+            belongs[:,0]+=img_y[0]
+            belongs[:,1]+=img_x[0]
+
         return heatmap,belongs
+
+    def generate_onehot(self,heatmap,center):  
+        mu_x = int(center[0] + 0.5)
+        mu_y = int(center[1] + 0.5)
+        h, w = heatmap.shape[0], heatmap.shape[1]
+        img_x = min(max(0, mu_x),w)
+        img_y = min(max(0, mu_y), h)
+        heatmap[img_y, img_x] =1.0
+        belongs=np.zeros((1,2),dtype=np.int64)
+        belongs[0,0]=img_y
+        belongs[0,1]=img_x
+        return heatmap,belongs
+
 
 
     def get_centerpoint(self, lis):
