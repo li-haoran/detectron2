@@ -313,7 +313,8 @@ class PointsCollection(nn.Module):
         gt_clses=np.stack(gt_clses)
         gt_clses=torch.from_numpy(gt_clses).to(device=self.device)
 
-        gt_clses_binary=torch.tensor(gt_clses.clone().detach()>0,dtype=torch.float32,device=self.device)
+        # gt_clses_binary=torch.tensor(gt_clses.clone().detach()>0,dtype=torch.float32,device=self.device)
+        gt_clses_binary=gt_clses.clone().detach()
         
         gt_belongs=np.concatenate(gt_belongs)
         gt_belongs=torch.from_numpy(gt_belongs).to(device=self.device)

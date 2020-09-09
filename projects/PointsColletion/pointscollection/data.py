@@ -87,10 +87,14 @@ class Targets:
             heatmap[img_y[0]:img_y[1], img_x[0]:img_x[1]],
             g[g_y[0]:g_y[1], g_x[0]:g_x[1]])
 
-        belongs=np.argwhere(heatmap[img_y[0]:img_y[1], img_x[0]:img_x[1]]==g[g_y[0]:g_y[1], g_x[0]:g_x[1]])
-        if belongs.shape[0]>0:
-            belongs[:,0]+=img_y[0]
-            belongs[:,1]+=img_x[0]
+        # belongs=np.argwhere(heatmap[img_y[0]:img_y[1], img_x[0]:img_x[1]]==g[g_y[0]:g_y[1], g_x[0]:g_x[1]])
+        # if belongs.shape[0]>0:
+        #     belongs[:,0]+=img_y[0]
+        #     belongs[:,1]+=img_x[0]
+        # one hot center 
+        belongs=np.zeros((1,2),dtype=np.float32)
+        belongs[0,0]=mu_y
+        belongs[0,1]=mu_x
         return heatmap,belongs
 
 
