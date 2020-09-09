@@ -98,8 +98,8 @@ class Targets:
         mu_x = int(center[0] + 0.5)
         mu_y = int(center[1] + 0.5)
         h, w = heatmap.shape[0], heatmap.shape[1]
-        img_x = min(max(0, mu_x),w)
-        img_y = min(max(0, mu_y), h)
+        img_x = min(max(0, mu_x),w-1)
+        img_y = min(max(0, mu_y), h-1)
         heatmap[img_y, img_x] =1.0
         belongs=np.zeros((1,2),dtype=np.int64)
         belongs[0,0]=img_y
