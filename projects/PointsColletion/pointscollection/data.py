@@ -92,7 +92,7 @@ class Targets:
         #     belongs[:,0]+=img_y[0]
         #     belongs[:,1]+=img_x[0]
         # one hot center 
-        belongs=np.zeros((1,2),dtype=np.float32)
+        belongs=np.zeros((1,2),dtype=np.int64)
         belongs[0,0]=mu_y
         belongs[0,1]=mu_x
         return heatmap,belongs
