@@ -98,7 +98,7 @@ class PointsCollection(nn.Module):
         # v_gt = Visualizer(img, None)
         # # v_gt = v_gt.overlay_instances(boxes=batched_inputs[image_index]["instances"].gt_boxes)
         # anno_img = v_gt.get_image()
-        processed_results = detector_postprocess(results[image_index], img.shape[0], img.shape[1])
+        processed_results = _postprocess(results[image_index], img.shape[0], img.shape[1])
         predicted_boxes = processed_results.pred_boxes.tensor.detach().cpu().numpy()
         predicted_mask = processed_results.pred_masks.detach().cpu().numpy()
         predicted_points=processed_results.pred_points.detach().cpu().numpy()

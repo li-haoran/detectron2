@@ -1,11 +1,12 @@
 import torch
 import numpy as np
 from detectron2.utils.visualizer import Visualizer
+from detectron2.utils.colormap import random_color
 
 
 class exVisualizer(Visualizer):  
 
-     def overlay_instances(
+    def overlay_instances(
         self,
         *,
         boxes=None,
@@ -160,10 +161,10 @@ class exVisualizer(Visualizer):
         return self.output
 
     def _convert_points(self,points):
-        if isinstance(points,torch.tensor):
+        if isinstance(points,torch.Tensor):
             return points.cpu().numpy()
         else:
-            return np.asarary(points)
+            return np.asarray(points)
     def draw_points(self,points,color=(0.0,0.0,0.0)):
         for idx, point in enumerate(points):
             # draw keypoint
