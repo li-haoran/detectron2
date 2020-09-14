@@ -208,6 +208,7 @@ def _postprocess(results, output_height, output_width,):
     pred_masks=points_to_masks(pred_points,results.image_size)
 
     results.pred_masks = pred_masks
+    # results.pred_points = pred_points
    
     return results
 

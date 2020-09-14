@@ -80,7 +80,7 @@ class PointsCollection(nn.Module):
             batched_inputs (list): a list that contains input to the model.
             results (List[Instances]): a list of #images elements.
         """
-        from detectron2.utils.visualizer import Visualizer
+        from pointscollection.utils import exVisualizer as Visualizer
         from detectron2.data.detection_utils import convert_image_to_rgb
 
 
@@ -88,7 +88,7 @@ class PointsCollection(nn.Module):
             results
         ), "Cannot visualize inputs and results of different sizes"
         # storage = get_event_storage()
-        max_boxes = 1024
+        max_boxes = 20
 
         image_index = 0  # only visualize a single image
         img = batched_inputs[image_index]["image"]
@@ -100,10 +100,11 @@ class PointsCollection(nn.Module):
         # anno_img = v_gt.get_image()
         processed_results = detector_postprocess(results[image_index], img.shape[0], img.shape[1])
         predicted_boxes = processed_results.pred_boxes.tensor.detach().cpu().numpy()
-        # predicted_mask = processed_results.pred_masks.detach().cpu().numpy()
+        predicted_mask = processed_results.pred_masks.detach().cpu().numpy()
+        predicted_points=processed_results.pred_points.detach().cpu().numpy()
 
         v_pred = Visualizer(img, None)
-        v_pred = v_pred.overlay_instances(boxes=predicted_boxes[0:max_boxes],)
+        v_pred = v_pred.overlay_instances(boxes=predicted_boxes[0:max_boxes],masks=predicted_mask[0:max_boxes],points=predicted_points[0:max_boxes])
         prop_img = v_pred.get_image()
         vis_img =prop_img# np.vstack((anno_img, prop_img))
         # vis_img = vis_img.transpose(2, 0, 1)
