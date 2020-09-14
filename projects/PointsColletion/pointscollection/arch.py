@@ -373,15 +373,16 @@ class PointsCollection(nn.Module):
 
             N=center.size(0)
             # print(N)
-            if N>1024:
+            TOPK=20
+            if N>TOPK:
                 pred_prob, topk_idxs = pred_prob.sort(descending=True)
                 # Keep top k scoring values
-                pred_prob = pred_prob[:1024]
+                pred_prob = pred_prob[:TOPK]
                 # Keep top k values
-                center = center[topk_idxs[:1024],:]
-                points_n = points_n[:,topk_idxs[:1024]]
-                cls_idxs=cls_idxs[topk_idxs[:1024]]
-                N=1024
+                center = center[topk_idxs[:TOPK],:]
+                points_n = points_n[:,topk_idxs[:TOPK]]
+                cls_idxs=cls_idxs[topk_idxs[:TOPK]]
+                N=TOPK
             
             center=center.view(N,1,2)
                        
