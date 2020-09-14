@@ -274,7 +274,7 @@ class PointsCollection(nn.Module):
         # print(pred_points_valids_contour.size(),gt_masks.size())       
         l1_loss = torch.abs(pred_points_valids_contour - gt_masks)
         distance = torch.sum(l1_loss,dim=2)
-        min_l1_loss,_=torch.min(distance,dim=2)
+        min_l1_loss,_=torch.min(distance,dim=1) #each gt points find a predction
 
         loss_mask=torch.mean(min_l1_loss)*self.mask_loss_weight
         
