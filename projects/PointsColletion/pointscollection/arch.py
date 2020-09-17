@@ -287,10 +287,10 @@ class PointsCollection(nn.Module):
 
             ## this is max side alignment
             p_norm=torch.abs(p_align)
-            p_norm=torch.max(p_norm,dim=1,keepdim=True)
+            p_norm,_=torch.max(p_norm,dim=1,keepdim=True)
 
             g_norm=torch.abs(g_align)
-            g_norm=torch.max(g_norm,dim=3,keepdim=True)
+            g_norm,_=torch.max(g_norm,dim=3,keepdim=True)
 
             p_norm=torch.clamp(p_norm, min=eps,max=max_side)
             g_norm=torch.clamp(g_norm,min=eps,max=max_side)
@@ -298,7 +298,7 @@ class PointsCollection(nn.Module):
             p_align_new=p_align*g_norm/p_norm
 
             distance=torch.sum((p_align_new-g_align)**2,dim=2,keepdim=True)
-            min_v,min_index=torch.min(distance,dim=3,keepdim=True)
+            _,min_index=torch.min(distance,dim=3,keepdim=True)
 
             gt_mask_tran=torch.transpose(gt_masks_copy,1,3)
             rep_min_index=torch.cat([min_index,min_index],dim=2)
