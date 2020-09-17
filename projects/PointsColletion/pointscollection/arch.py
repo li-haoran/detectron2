@@ -218,6 +218,9 @@ class PointsCollection(nn.Module):
                 "loss_cls", and "loss_mask".
         """
         num_fg=gt_belongs.size(0)
+        eps=10e-5
+        w,h=pred_points.size(2),pred_points.size(3)
+        max_side=w*0.5 if w>h else h*0.5
         # print(num_fg,torch.sum(gt_clses))
         loss_normalizer = torch.tensor(max(1, num_fg), dtype=torch.float32, device=self.device)
 
@@ -271,12 +274,39 @@ class PointsCollection(nn.Module):
             # Inner=torch.tensor(Inner,dtype=torch.int64,device=self.device)
             # pred_points_valids_inner=pred_points_valids[:,Inner,:,:]
 
-        # print(pred_points_valids_contour.size(),gt_masks.size())       
-        l1_loss = torch.abs(pred_points_valids_contour - gt_masks)
-        distance = torch.sum(l1_loss,dim=2)
-        min_l1_loss,_=torch.min(distance,dim=1) #each gt points find a predction
+        # print(pred_points_valids_contour.size(),gt_masks.size())
+        with torch.no_grad():
+            pred_points_valids_contour_copy=pred_points_valids_contour.detach()
+            gt_masks_copy=gt_masks.detach()
 
-        loss_mask=torch.mean(min_l1_loss)*self.mask_loss_weight
+            p_mean=torch.mean(pred_points_valids_contour_copy,dim=1,keepdim=True)
+            g_mean=torch.mean(gt_masks_copy,dim=3,keepdim=True)
+
+            p_align=pred_points_valids_contour_copy-p_mean
+            g_align=gt_masks_copy-g_mean
+
+            ## this is max side alignment
+            p_norm=torch.abs(p_align)
+            p_norm=torch.max(p_norm,dim=1,keepdim=True)
+
+            g_norm=torch.abs(g_align)
+            g_norm=torch.max(g_norm,dim=3,keepdim=True)
+
+            p_norm=torch.clamp(p_norm, min=eps,max=max_side)
+            g_norm=torch.clamp(g_norm,min=eps,max=max_side)
+
+            p_align_new=p_align*g_norm/p_norm
+
+            distance=torch.sum((p_align_new-g_align)**2,dim=2,keepdim=True)
+            min_v,min_index=torch.min(distance,dim=3,keepdim=True)
+
+            gt_mask_tran=torch.transpose(gt_masks_copy,1,3)
+            rep_min_index=torch.cat([min_index,min_index],dim=2)
+            gt_masks_ref=torch.gather(gt_mask_tran,1,rep_min_index)
+     
+                   
+        min_l1_loss=F.l1_loss(pred_points_valids_contour,gt_masks_ref)
+        loss_mask=min_l1_loss*self.mask_loss_weight
         
         losses["loss_mask"] = loss_mask
         return losses
