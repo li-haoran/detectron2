@@ -276,8 +276,8 @@ class PointsCollection(nn.Module):
 
         # print(pred_points_valids_contour.size(),gt_masks.size())
         #chamber distance:
-        p2pdistance=torch.sum(torch.abs(pred_points_valids_contour-gt_masks),dim=2)
-        # p2pdistance=torch.sum((pred_points_valids_contour-gt_masks)**2,dim=2)
+        # p2pdistance=torch.sum(torch.abs(pred_points_valids_contour-gt_masks),dim=2)
+        p2pdistance=torch.sum((pred_points_valids_contour-gt_masks)**2,dim=2)
 
         dist1,_=torch.min(p2pdistance,dim=1)
         dist2,_=torch.min(p2pdistance,dim=2)
