@@ -390,7 +390,7 @@ class PointsCollection(nn.Module):
             image_size = images.image_sizes[img_idx]
 
             digits_im = pred_digits[img_idx]
-            pool_digits_im=pred_digits[img_idx]
+            pool_digits_im=pool_digits[img_idx]
             points_im=pred_points[img_idx]
             # print(points_im[:,15,15].view(-1,2).cpu().numpy())
 
