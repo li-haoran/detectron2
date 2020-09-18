@@ -93,6 +93,7 @@ class PointsCollection(nn.Module):
         image_index = 0  # only visualize a single image
         img = batched_inputs[image_index]["image"]
         img = convert_image_to_rgb(img.permute(1, 2, 0), "BGR")
+        print(batched_inputs[0]['file_name'],batched_inputs[0]['image_id'])
 
 
         # v_gt = Visualizer(img, None)
@@ -109,8 +110,10 @@ class PointsCollection(nn.Module):
         vis_img =prop_img# np.vstack((anno_img, prop_img))
         # vis_img = vis_img.transpose(2, 0, 1)
         # vis_name = f"Top: GT bounding boxes; Bottom: {max_boxes} Highest Scoring Results"
-        plt.imshow(vis_img)
-        plt.show()
+        # plt.imshow(vis_img)
+        # plt.show()
+        plt.imsave('output/result_show/{:0>12}.png'.format(batched_inputs[0]['image_id']),vis_img)
+        
 
         # storage.put_image(vis_name, vis_img)
         # img = image[0]
@@ -181,9 +184,9 @@ class PointsCollection(nn.Module):
         else:
             # do inference to get the output
             results = self.inference(pred_digits, pred_points,images)
-            plt.imshow(np.max(pred_digits[0].cpu().numpy(),0))
-            plt.show()
-            self.visualize_training(batched_inputs,results)
+            # plt.imshow(np.max(pred_digits[0].cpu().numpy(),0))
+            # plt.show()
+            # self.visualize_training(batched_inputs,results)
             processed_results = []
             for results_im, input_im, image_size in zip(
                 results, batched_inputs, images.image_sizes
@@ -409,7 +412,7 @@ class PointsCollection(nn.Module):
             points_n=points_n_yx.clone().detach()
             points_n[::2,:]=points_n_yx[1::2,:]
             points_n[1::2,:]=points_n_yx[::2,:]
-            print(points_n,points_n.size())
+            # print(points_n,points_n.size())
 
             N=center.size(0)
             # print(N)
@@ -436,7 +439,7 @@ class PointsCollection(nn.Module):
             bottom_right,_=torch.max(real_npoints,dim=1)
 
             bbox=torch.cat([top_left,bottom_right],dim=1)
-            print(pred_prob,center,bbox)
+            # print(pred_prob,center,bbox)
 
             results_im.pred_classes = cls_idxs
             results_im.pred_boxes = Boxes(bbox)
