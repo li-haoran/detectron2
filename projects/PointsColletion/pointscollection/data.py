@@ -216,6 +216,8 @@ def _postprocess(results, output_height, output_width,):
 def points_to_masks(pred_points,image_size):
 
     N=pred_points.size(0)
+    if N <1:
+        return torch.zeros(0,800,800,dtype=torch.bool)
     masks=[]
     for i in range(N):
         points=pred_points[i].cpu().numpy()
