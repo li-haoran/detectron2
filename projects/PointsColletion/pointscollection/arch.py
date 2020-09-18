@@ -401,6 +401,10 @@ class PointsCollection(nn.Module):
 
             results_im=Instances(image_size)
             if Index.size(0)<1:
+                results_im.pred_classes = Index.new_zeros(0)
+                results_im.pred_boxes = Boxes(Index.new_zeros(0,4))
+                results_im.scores = Index.new_zeros(0)
+                results_im.pred_points=Index.new_zeros(0,points_im.size(0)//2,2)
                 results.append(results_im)
                 continue
                 
