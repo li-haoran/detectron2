@@ -6,7 +6,7 @@ from detectron2.structures import Boxes,Instances
 
 import matplotlib.pyplot as plt
 
-
+CONTOUR_SIZE=81
 class Targets:
     def __init__(self,cfg,pc_stride,cls_stride):
         
@@ -31,7 +31,7 @@ class Targets:
         belongs=[]
         for i in range(N):
             this_bitmask=bitmask[i]
-            center,count=self.fill_expand_polygon_center(np.uint8(this_bitmask))
+            center,count=self.fill_expand_points_center(np.uint8(this_bitmask))
 
             # plt.imshow(this_bitmask)
             # plt.scatter(count[:,0],count[:,1])
@@ -164,6 +164,67 @@ class Targets:
         new_count[:,1]=newy
       
         return np.array(center),new_count
+
+    def fill_expand_points_center(self,bitmask):
+        contour, _ = cv2.findContours(bitmask, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
+        contour.sort(key=lambda x: cv2.contourArea(x), reverse=True) #only save the biggest one
+        '''debug IndexError: list index out of range'''
+        count = contour[0][:, 0, :]
+        try:
+            center = self.get_centerpoint(count)
+        except:
+            x,y = count.mean(axis=0)
+            center=[int(x), int(y)]
+
+        ISize=self.contour-CONTOUR_SIZE
+        new_count=np.zeros((CONTOUR_SIZE,2),dtype=np.float32)
+        new_inner_points=np.zeros((ISize,2),dtype=np.float32)
+        length=count.shape[0]
+        if length<2:
+            # print(contour)
+            # plt.imshow(bitmask)
+            # plt.scatter(count[:,0],count[:,1])
+            # plt.show()
+            new_count[:,0]=count[0,0]
+            new_count[:,1]=count[0,1]
+            new_inner_points[:,0]=count[0,0]
+            new_inner_points[:,1]=count[0,1]
+            return np.array(center),np.concatenate([new_count,new_inner_points],axis=1)
+
+        interval=1.0*(length-1)/(CONTOUR_SIZE-1)    
+        z=[x*interval for x in range(CONTOUR_SIZE)]
+        z_org=range(length)
+        # print(count.shape)
+        interx=interp1d(z_org,count[:,0],bounds_error=False,fill_value="extrapolate")
+        newx=interx(z)
+        intery=interp1d(z_org,count[:,1],bounds_error=False,fill_value="extrapolate")
+        newy=intery(z)
+        new_count[:,0]=newx
+        new_count[:,1]=newy
+
+        new_mask=bitmask.copy()
+        new_mask=0
+        new_mask=cv2.fillPoly(new_mask,[count,],255)
+        inner_points=np.argwhere(new_mask>100)
+        inner_points_yx2xy=inner_points[:,(1,0)]
+        inner_points_size=inner_points_yx2xy.shape[0]
+        
+        if inner_points_yx2xy.shape[0]<ISize: 
+            extra_size=ISize-inner_points_size      
+            index=np.random.choice(inner_points_size,extra_size, replace=False) 
+
+            extra=inner_points_yx2xy[index,:]+(np.random.rand(extra_size,2)-0.5)
+            new_inner_points[:inner_points_size,:]=inner_points_yx2xy
+            new_inner_points[inner_points_size:,:]=extra
+        else:
+            index=np.random.choice(inner_points_size, ISize, replace=False)
+            new_inner_points[:,:]=inner_points_yx2xy[index,:]
+
+        return np.array(center),np.concatenate([new_count,new_inner_points],axis=1)
+
+
+
+        
 
 
 
