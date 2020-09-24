@@ -27,7 +27,7 @@ def add_pointscollection_config(cfg):
     cfg.MODEL.POINTS_COLLECTION.SCORE_THRESH_TEST =0.1
 
     cfg.MODEL.POINTS_COLLECTION.SIGMA = 2
-    cfg.MODEL.POINTS_COLLECTION.CONTOUR = 81
+    cfg.MODEL.POINTS_COLLECTION.CONTOUR = 729
 
 
     cfg.INPUT.MASK_FORMAT = "bitmask" 
