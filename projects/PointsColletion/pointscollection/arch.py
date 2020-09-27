@@ -278,16 +278,20 @@ class PointsCollection(nn.Module):
             # pred_points_valids_inner=pred_points_valids[:,Inner,:,:]
 
         # print(pred_points_valids_contour.size(),gt_masks.size())
-        #chamber distance:
+        #chamfer distance:
         # p2pdistance=torch.sum(torch.abs(pred_points_valids_contour-gt_masks),dim=2)
-        p2pdistance= torch.abs(pred_points_valids_contour - gt_masks)
-        p2pdistance= torch.where(p2pdistance < 1, 0.5 * p2pdistance ** 2, p2pdistance - 0.5)
-        # p2pdistance=torch.sum((pred_points_valids_contour-gt_masks)**2,dim=2)
+        # p2pdistance= torch.abs(pred_points_valids_contour - gt_masks)
+        # p2pdistance= torch.where(p2pdistance < 1, 0.5 * p2pdistance ** 2, p2pdistance - 0.5)
+        p2pdistance=torch.sum((pred_points_valids_contour-gt_masks)**2,dim=2)
 
         dist1,_=torch.min(p2pdistance,dim=1)
         dist2,_=torch.min(p2pdistance,dim=2)
 
-        loss_mask=(torch.mean(dist1)+torch.mean(dist2))*self.mask_loss_weight
+        dist1=dist1.mean(-1)
+        dist2=dist2.mean(-1)
+        dist=(dist1+dist2)/2.0
+
+        loss_mask=torch.mean(dist)*self.mask_loss_weight
 
         # with torch.no_grad():
         #     pred_points_valids_contour_copy=pred_points_valids_contour.detach()
