@@ -1,5 +1,6 @@
 import torch
 import numpy as np
+from scipy.spatial.qhull import Delaunay
 from detectron2.utils.visualizer import Visualizer
 from detectron2.utils.colormap import random_color
 
@@ -166,7 +167,11 @@ class exVisualizer(Visualizer):
         else:
             return np.asarray(points)
     def draw_points(self,points,color=(0.0,0.0,0.0)):
-        for idx, point in enumerate(points):
-            # draw keypoint
-            x, y = point
-            self.draw_circle((x, y), color=color)
+        tri = Delaunay(points)
+        self.output.ax.triplot(points[:,0], points[:,1], tri.simplices)
+        self.output.ax.plot(points[:,0], points[:,1], 'o',color=color)
+
+        # for idx, point in enumerate(points):
+        #     # draw keypoint
+        #     x, y = point
+        #     self.draw_circle((x, y), color=color)
