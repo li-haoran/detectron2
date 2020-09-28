@@ -111,7 +111,7 @@ class exVisualizer(Visualizer):
                 for segment in masks[i].polygons:
                     self.draw_polygon(segment.reshape(-1, 2), color, alpha=alpha)
             if points is not None:
-                self.draw_points(points[i],color=(0.0,0.0,0.0))
+                self.draw_points(points[i],color=color)
 
             if labels is not None:
                 # first get a box
@@ -168,7 +168,7 @@ class exVisualizer(Visualizer):
             return np.asarray(points)
     def draw_points(self,points,color=(0.0,0.0,0.0)):
         tri = Delaunay(points)
-        self.output.ax.triplot(points[:,0], points[:,1], tri.simplices)
+        self.output.ax.triplot(points[:,0], points[:,1], tri.simplices,color=color)
         self.output.ax.plot(points[:,0], points[:,1], 'o',color=color)
 
         # for idx, point in enumerate(points):
