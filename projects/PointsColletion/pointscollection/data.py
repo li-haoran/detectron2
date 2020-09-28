@@ -211,7 +211,7 @@ class Targets:
         # print(inner_points_size,ISize)
         if inner_points_size<ISize: 
             extra_size=ISize-inner_points_size      
-            index=np.random.choice(inner_points_size,extra_size, replace=False) 
+            index=np.random.choice(inner_points_size,extra_size, replace=True) 
 
             extra=inner_points_yx2xy[index,:]+(np.random.rand(extra_size,2)-0.5)
             new_inner_points[:inner_points_size,:]=inner_points_yx2xy
