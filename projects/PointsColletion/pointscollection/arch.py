@@ -222,7 +222,6 @@ class PointsCollection(nn.Module):
                 "loss_cls", and "loss_mask".
         """
         num_fg=gt_belongs.size(0)
-        eps=10e-5
         w,h=pred_points.size(2),pred_points.size(3)
         max_side=w*0.5 if w>h else h*0.5
         # print(num_fg,torch.sum(gt_clses))
