@@ -20,6 +20,7 @@ from detectron2.utils.logger import log_first_n
 
 from pointscollection.head import PointsCollectionHead,ClsHead
 from pointscollection.data import Targets,_postprocess
+from pointscollection.loss import chamfer_loss,normlize_chamfer_loss
 
 import matplotlib.pyplot as plt
 
@@ -279,52 +280,10 @@ class PointsCollection(nn.Module):
 
         # print(pred_points_valids_contour.size(),gt_masks.size())
         #chamfer distance:
-        # p2pdistance=torch.sum(torch.abs(pred_points_valids_contour-gt_masks),dim=2)
-        # p2pdistance= torch.abs(pred_points_valids_contour - gt_masks)
-        # p2pdistance= torch.where(p2pdistance < 1, 0.5 * p2pdistance ** 2, p2pdistance - 0.5)
-        p2pdistance=torch.sum((pred_points_valids_contour-gt_masks)**2,dim=2)
+        # loss_mask=chamfer_loss(pred_points_valids_contour,gt_masks)*self.mask_loss_weight
 
-        dist1,_=torch.min(p2pdistance,dim=1)
-        dist2,_=torch.min(p2pdistance,dim=2)
-
-        dist1=dist1.mean(-1)
-        dist2=dist2.mean(-1)
-        dist=(dist1+dist2)/2.0
-
-        loss_mask=torch.mean(dist)*self.mask_loss_weight
-
-        # with torch.no_grad():
-        #     pred_points_valids_contour_copy=pred_points_valids_contour.detach()
-        #     gt_masks_copy=gt_masks.detach()
-
-        #     p_mean=torch.mean(pred_points_valids_contour_copy,dim=1,keepdim=True)
-        #     g_mean=torch.mean(gt_masks_copy,dim=3,keepdim=True)
-
-        #     p_align=pred_points_valids_contour_copy-p_mean
-        #     g_align=gt_masks_copy-g_mean
-
-        #     ## this is max side alignment
-        #     p_norm=torch.abs(p_align)
-        #     p_norm,_=torch.max(p_norm,dim=1,keepdim=True)
-
-        #     g_norm=torch.abs(g_align)
-        #     g_norm,_=torch.max(g_norm,dim=3,keepdim=True)
-
-        #     p_norm=torch.clamp(p_norm, min=eps,max=max_side)
-        #     g_norm=torch.clamp(g_norm,min=eps,max=max_side)
-
-        #     p_align_new=p_align*g_norm/p_norm
-
-        #     distance=torch.sum((p_align_new-g_align)**2,dim=2,keepdim=True)
-        #     _,min_index=torch.min(distance,dim=3,keepdim=True)
-
-        #     gt_mask_tran=torch.transpose(gt_masks_copy,1,3)
-        #     rep_min_index=torch.cat([min_index,min_index],dim=2)
-        #     gt_masks_ref=torch.gather(gt_mask_tran,1,rep_min_index)
-     
-                   
-        # min_l1_loss=F.l1_loss(pred_points_valids_contour,gt_masks_ref)
-        # loss_mask=min_l1_loss*self.mask_loss_weight
+        #normlized chamfer distance
+        loss_mask=normlize_chamfer_loss(pred_points_valids_contour,gt_masks,max_side=max_side)*self.mask_loss_weight
         
         losses["loss_mask"] = loss_mask
         return losses
