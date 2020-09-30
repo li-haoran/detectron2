@@ -14,6 +14,7 @@ import numpy as np
 
 from points_collection_ops.modules.points_collect import PointsCollectPack
 from points_collection_ops.functions.points_collect import points_collect
+from scatter_feature_ops.functions.scatter_feature import scatter_feature
 
 N, inC, inH, inW = 2, 18, 5,5
 tgC=4
@@ -99,6 +100,27 @@ def example_pcp():
     plot_according_to_point(im,source_points,center)
 
 
+def check_scatter():
+    N=16
+    inC=512
+    feature = torch.rand(N, inC, 64, 64).double().cuda()
+    sample_offsets=torch.rand(20,729,2).double().cuda()*30
+    batch_index=torch.randint(0,N,20).int().cuda()
+
+    feature.requires_grad = True
+    feature.retain_grad()
+    sample_offsets.requires_grad = True
+    sample_offsets.retain_grad()
+
+    output=scatter_feature(feature,sample_offsets,batch_index)
+    print(output.size())
+
+    print('check_gradient_sf: ',
+          gradcheck(ScatterFeaturePack, (feature,sample_offsets,batch_index),
+                    ))#eps=1e-3, atol=1e-4, rtol=1e-2
+
+
+
 
 if __name__ == '__main__':
 
@@ -108,3 +130,4 @@ if __name__ == '__main__':
     # a=input('num:')
 
     check_gradient_pc()
+    check_scatter()
