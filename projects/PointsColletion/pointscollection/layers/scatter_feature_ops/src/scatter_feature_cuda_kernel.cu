@@ -481,8 +481,8 @@ __global__ void coord_inst2img_gpu_kernel(
              grad_output_ptr[h_high * width_out + w_high]);
       }
 
-      grad_sample_offsets_[data_offset_h_index] = h_grad;
-      grad_sample_offsets_[data_offset_w_index] = w_grad;
+      atomicAdd(grad_sample_offsets_+data_offset_h_index,h_grad);
+      atomicAdd(grad_sample_offsets_+data_offset_w_index,w_grad);
     }
   }
 }

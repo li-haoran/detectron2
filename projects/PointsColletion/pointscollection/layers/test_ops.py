@@ -102,13 +102,13 @@ def example_pcp():
 
 def check_scatter():
     N=2
-    inC=1
+    inC=16
     feature = torch.rand(N, inC, 5, 5).double().cuda()
     # feature[0]=0.5
     # feature[1]=1
-    sample_offsets=torch.rand(3,2,2).double().cuda()*4
+    sample_offsets=torch.rand(5,2,2).double().cuda()*4
     # sample_offsets[:]=0.5
-    batch_index=torch.tensor([0,1,0]).double().cuda()
+    batch_index=torch.tensor([0,1,0,1,1]).double().cuda()
 
     feature.requires_grad = True
     feature.retain_grad()
