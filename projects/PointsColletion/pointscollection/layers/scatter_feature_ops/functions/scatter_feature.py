@@ -26,9 +26,6 @@ class ScatterFeatureFunction(Function):
 
         output = feature.new_empty(
             ScatterFeatureFunction._output_size(feature,sample_offsets))
-        output_count=feature.new_empty(
-            ScatterFeatureFunction._output_size(feature,sample_offsets))
-
 
         if not sample_offsets.is_cuda:
             raise NotImplementedError
@@ -37,14 +34,12 @@ class ScatterFeatureFunction(Function):
             assert (sample_offsets.size(2) % 2) == 0, 'sample_offsets channels must be even number'
             assert batch_index.size(0)==sample_offsets.size(0),'the num_instance mismath'
             scatter_feature_cuda.scatter_feature_forward_cuda(
-                feature,sample_offsets, batch_index,output,output_count)
-        ctx.output_count=output_count
+                feature,sample_offsets, batch_index,output)
         return output
 
     @staticmethod
     def backward(ctx, grad_output):
         feature,sample_offsets,batch_index = ctx.saved_tensors
-        output_count=ctx.output_count
 
         grad_feature = grad_sample_offsets =  None
 
@@ -55,7 +50,7 @@ class ScatterFeatureFunction(Function):
                 grad_sample_offsets = torch.zeros_like(sample_offsets)
                 grad_feature = torch.zeros_like(feature)
                 scatter_feature_cuda.scatter_feature_backward_cuda(
-                feature,sample_offsets,batch_index,output_count,grad_feature,grad_sample_offsets,grad_output)
+                feature,sample_offsets,batch_index,grad_feature,grad_sample_offsets,grad_output)
                 
 
         return (grad_feature,grad_sample_offsets,None)

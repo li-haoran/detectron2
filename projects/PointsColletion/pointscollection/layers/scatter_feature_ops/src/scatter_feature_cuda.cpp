@@ -15,14 +15,12 @@ void scatter_img2inst(
     const int channel_out,
     const int height_out,
     const int width_out,
-    at::Tensor data_col,
-    at::Tensor output_count);
+    at::Tensor data_col);
 
 void scatter_inst2img(
     const at::Tensor data_feature,
     const at::Tensor data_sample_offsets,
     const at::Tensor data_batch_index,
-    const at::Tensor data_output_count,
     const int num_instance,
     const int num_points,
     const int channel_out,
@@ -56,8 +54,7 @@ void scatter_feature_forward_cuda(
     at::Tensor feature,
     at::Tensor sample_offsets,
     at::Tensor batch_index,
-    at::Tensor output,
-    at::Tensor output_count) {
+    at::Tensor output) {
 
 
   shape_check(feature, sample_offsets);
@@ -76,7 +73,6 @@ void scatter_feature_forward_cuda(
 
   // resize output
   output = output.zero_();
-  output_count = output_count.zero_();
 
   scatter_img2inst(
       feature,
@@ -87,15 +83,13 @@ void scatter_feature_forward_cuda(
       channel_out,
       height_out,
       width_out,
-      output,
-      output_count);
+      output);
 }
 
 void scatter_feature_backward_cuda(
     at::Tensor feature,
     at::Tensor sample_offsets,
     at::Tensor batch_index,
-    at::Tensor output_count,
     at::Tensor grad_feature,
     at::Tensor grad_sample_offsets,
     at::Tensor grad_output) {
@@ -116,7 +110,6 @@ void scatter_feature_backward_cuda(
       feature,
       sample_offsets,
       batch_index,
-      output_count,
       n_instance,
       n_points,
       channel_out,
