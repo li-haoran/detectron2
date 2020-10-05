@@ -290,7 +290,6 @@ __global__ void scatter_inst2img_gpu_kernel(
     const int feature_index =
         b * channel_out * height_out * width_out + c * height_out * width_out;
     scalar_t* grad_feature_ptr = grad_feature_ + feature_index;
-    const scalar_t* data_feature_ptr = data_feature_ + feature_index;
 
     if (h_im > -1 && h_im < height_out && w_im > -1 && w_im < width_out) {
       int h_low = floor(h_im);
@@ -409,7 +408,6 @@ __global__ void coord_inst2img_gpu_kernel(
     const scalar_t* grad_output_ptr = grad_output_ + grad_output_index;
     const int feature_index =
         b * channel_out * height_out * width_out + c * height_out * width_out;
-    scalar_t* grad_feature_ptr = grad_feature_ + feature_index;
     const scalar_t* data_feature_ptr = data_feature_ + feature_index;
 
     if (h_im > -1 && h_im < height_out && w_im > -1 && w_im < width_out) {
@@ -437,10 +435,10 @@ __global__ void coord_inst2img_gpu_kernel(
 
         h_grad +=
             ((h_coor_weight * mid_feature + h_weight * weight) *
-             grad_feature_ptr[h_low * width_out + w_low]);
+             grad_output_ptr[h_low * width_out + w_low]);
         w_grad +=
             ((w_coor_weight * mid_feature + w_weight * weight) *
-             grad_feature_ptr[h_low * width_out + w_low]);
+             grad_output_ptr[h_low * width_out + w_low]);
       }
 
       // lh
@@ -451,10 +449,10 @@ __global__ void coord_inst2img_gpu_kernel(
 
         h_grad +=
             ((h_coor_weight * mid_feature + h_weight * weight) *
-             grad_feature_ptr[h_low * width_out + w_high]);
+             grad_output_ptr[h_low * width_out + w_high]);
         w_grad +=
             ((w_coor_weight * mid_feature + w_weight * weight) *
-             grad_feature_ptr[h_low * width_out + w_high]);
+             grad_output_ptr[h_low * width_out + w_high]);
       }
       // hl
       if (h_high <= height_out - 1 && w_low >= 0) {
@@ -464,10 +462,10 @@ __global__ void coord_inst2img_gpu_kernel(
 
         h_grad +=
             ((h_coor_weight * mid_feature + h_weight * weight) *
-             grad_feature_ptr[h_high * width_out + w_low]);
+             grad_output_ptr[h_high * width_out + w_low]);
         w_grad +=
             ((w_coor_weight * mid_feature + w_weight * weight) *
-             grad_feature_ptr[h_high * width_out + w_low]);
+             grad_output_ptr[h_high * width_out + w_low]);
       }
       // hh
       if (h_high <= height_out - 1 && w_high <= width_out - 1) {
@@ -477,10 +475,10 @@ __global__ void coord_inst2img_gpu_kernel(
 
         h_grad +=
             ((h_coor_weight * mid_feature + h_weight * weight) *
-             grad_feature_ptr[h_high * width_out + w_high]);
+             grad_output_ptr[h_high * width_out + w_high]);
         w_grad +=
             ((w_coor_weight * mid_feature + w_weight * weight) *
-             grad_feature_ptr[h_high * width_out + w_high]);
+             grad_output_ptr[h_high * width_out + w_high]);
       }
 
       grad_sample_offsets_[data_offset_h_index] = h_grad;

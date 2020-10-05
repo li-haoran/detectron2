@@ -127,7 +127,7 @@ void scatter_feature_backward_cuda(
       grad_feature,
       grad_output);
 
-  coord_inst_img(
+  coord_inst2img(
       feature,
       sample_offsets,
       batch_index,
@@ -138,8 +138,6 @@ void scatter_feature_backward_cuda(
       width_out,
       grad_sample_offsets,
       grad_output);
-
-)
 }
 
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {

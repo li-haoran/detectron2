@@ -114,13 +114,13 @@ def check_scatter():
     feature.retain_grad()
     sample_offsets.requires_grad = True
     sample_offsets.retain_grad()
-    batch_index.requires_grad = True
-    batch_index.retain_grad()
+    # batch_index.requires_grad = True
+    # batch_index.retain_grad()
 
 
 
-    output=scatter_feature(feature,sample_offsets,batch_index)
-    print(feature,sample_offsets,batch_index,output)
+    # output=scatter_feature(feature,sample_offsets,batch_index)
+    # print(feature,sample_offsets,batch_index,output)
     print('check_gradient_sf: ',
           gradcheck(scatter_feature, (feature,sample_offsets,batch_index),
                     ))#eps=1e-3, atol=1e-4, rtol=1e-2
