@@ -12,7 +12,8 @@ void scatter_img2inst(
     const at::Tensor data_batch_index,
     const int num_instance,
     const int num_points,
-    const int channel_out const int height_out,
+    const int channel_out,
+    const int height_out,
     const int width_out,
     at::Tensor data_col,
     at::Tensor output_count);
@@ -24,7 +25,8 @@ void scatter_inst2img(
     const at::Tensor data_output_count,
     const int num_instance,
     const int num_points,
-    const int channel_out const int height_out,
+    const int channel_out,
+    const int height_out,
     const int width_out,
     at::Tensor grad_feature,
     at::Tensor grad_sample_offsets,
@@ -62,11 +64,9 @@ void scatter_feature_forward_cuda(
 
   feature = feature.contiguous();
   sample_offsets = sample_offsets.contiguous();
-  batch_index = batch_index.contiguous()
+  batch_index = batch_index.contiguous();
 
-                // todo: assert batch dividable by im2col_step
-
-                const int batch = feature.size(0);
+  const int batch = feature.size(0);
   const int channel_out = feature.size(1);
   const int height_out = feature.size(2);
   const int width_out = feature.size(3);
@@ -94,7 +94,6 @@ void scatter_feature_forward_cuda(
 void scatter_feature_backward_cuda(
     at::Tensor feature,
     at::Tensor sample_offsets,
-    ,
     at::Tensor batch_index,
     at::Tensor output_count,
     at::Tensor grad_feature,

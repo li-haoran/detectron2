@@ -1,6 +1,6 @@
-from .functions.points_collect import points_collect
-from .modules.points_collect import PointsCollectPack
+from .functions.scatter_feature import scatter_feature
+from .modules.scatter_feature import ScatterFeaturePack
 
 __all__ = [
-    'point_collect','PointsCollectPack'
+    'scatter_feature','ScatterFeaturePack'
 ]

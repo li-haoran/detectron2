@@ -28,6 +28,41 @@ const int kMaxGridNum = 65535;
 inline int GET_BLOCKS(const int N) {
   return std::min(kMaxGridNum, (N + CUDA_NUM_THREADS - 1) / CUDA_NUM_THREADS);
 }
+template <typename scalar_t>
+__device__ scalar_t bilinear(
+    const scalar_t* bottom_data,
+    const int data_width,
+    const int height,
+    const int width,
+    scalar_t h,
+    scalar_t w) {
+  int h_low = floor(h);
+  int w_low = floor(w);
+  int h_high = h_low + 1;
+  int w_high = w_low + 1;
+
+  scalar_t lh = h - h_low;
+  scalar_t lw = w - w_low;
+  scalar_t hh = 1 - lh, hw = 1 - lw;
+
+  scalar_t v1 = 0;
+  if (h_low >= 0 && w_low >= 0)
+    v1 = bottom_data[h_low * data_width + w_low];
+  scalar_t v2 = 0;
+  if (h_low >= 0 && w_high <= width - 1)
+    v2 = bottom_data[h_low * data_width + w_high];
+  scalar_t v3 = 0;
+  if (h_high <= height - 1 && w_low >= 0)
+    v3 = bottom_data[h_high * data_width + w_low];
+  scalar_t v4 = 0;
+  if (h_high <= height - 1 && w_high <= width - 1)
+    v4 = bottom_data[h_high * data_width + w_high];
+
+  scalar_t w1 = hh * hw, w2 = hh * lw, w3 = lh * hw, w4 = lh * lw;
+
+  scalar_t val = (w1 * v1 + w2 * v2 + w3 * v3 + w4 * v4);
+  return val;
+}
 
 template <typename scalar_t>
 __device__ scalar_t get_gradient_weight(
@@ -118,7 +153,7 @@ __global__ void scatter_img2inst_gpu_kernel(
     const int n,
     const scalar_t* data_feature_,
     const scalar_t* data_sample_offsets_,
-    const int* data_batch_index_,
+    const scalar_t* data_batch_index_,
     const int num_instance,
     const int num_points,
     const int channel_out,
@@ -134,30 +169,30 @@ __global__ void scatter_img2inst_gpu_kernel(
     const int n = index / width_out / height_out / channel_out;
 
     const int b = data_batch_index_[n];
+    scalar_t avgval = 0;
+    scalar_t count = 0;
 
-    for (p = 0; p < num_points; p++) {
+    for (int p = 0; p < num_points; p++) {
       const int data_offset_h_ptr = (n * num_points + p) * 2;
       const int data_offset_w_ptr = (n * num_points + p) * 2 + 1;
       const scalar_t h_im = data_sample_offsets_[data_offset_h_ptr];
       const scalar_t w_im = data_sample_offsets_[data_offset_w_ptr];
-      scalar_t avgval = 0;
-      scalar_t count = 0;
-
       if (abs(h_im - h) < 1 && abs(w_im - w) < 1) {
         scalar_t weight =
             get_gradient_weight(h_im, w_im, h, w, height_out, width_out);
-        const int data_feature_index = b * channel_out * height_out * width +
-            c * height_out * width_out + h * width_out + w;
-        avgval += (weight * data_feature_[data_batch_index]);
-        count += 1;
-      }
-      if (count > 0) {
-        const int data_col_index = n * channel_out * height_out * width +
-            c * height_out * width_out + h * width_out + w;
-        data_col_[data_col_index] = avgval / count;
-        data_count_[data_col_index] = count;
+        const int data_feature_index = b * channel_out * height_out * width_out +
+            c * height_out * width_out;
+        scalar_t val=bilinear(data_feature+data_batch_index,width_out,height_out,width_out,h_im,w_im)
+        avgval += (weight * val);
       }
     }
+    if (count > 0) {
+      const int data_col_index = n * channel_out * height_out * width_out +
+          c * height_out * width_out + h * width_out + w;
+      data_col_[data_col_index] = avgval;
+      data_count_[data_col_index] = count;
+    }
+    
   }
 }
 
@@ -181,8 +216,9 @@ void scatter_img2inst(
         const scalar_t* data_feature_ = data_feature.data<scalar_t>();
         const scalar_t* data_sample_offsets_ =
             data_sample_offsets.data<scalar_t>();
-        const int* data_batch_index_ =
-            data_batch_index.data<int>() scalar_t* data_col_ =
+        const scalar_t* data_batch_index_ =
+            data_batch_index.data<scalar_t>();
+        scalar_t* data_col_ =
                 data_col.data<scalar_t>();
         scalar_t* data_count_ = output_count.data<scalar_t>();
 
@@ -213,7 +249,7 @@ __global__ void scatter_inst2img_gpu_kernel(
     const int n,
     const scalar_t* data_feature_,
     const scalar_t* data_sample_offsets_,
-    const int* data_batch_index_,
+    const scalar_t* data_batch_index_,
     const scalar_t* data_count_,
     const int num_instance,
     const int num_points,
@@ -232,19 +268,19 @@ __global__ void scatter_inst2img_gpu_kernel(
 
     const int b = data_batch_index_[n];
 
-    const int grad_output_index = n * channel_out * height_out * width +
+    const int grad_output_index = n * channel_out * height_out * width_out +
         c * height_out * width_out + h * width_out + w;
     const scalar_t grad_val = grad_output_[grad_output_index];
     const scalar_t num_count = data_count_[grad_output_index];
 
-    const int grad_feature_index = b * channel_out * height_out * width +
+    const int grad_feature_index = b * channel_out * height_out * width_out +
         c * height_out * width_out + h * width_out + w;
 
     const scalar_t* data_feature_ptr = data_feature_ +
-        (b * channel_out * height_out * width + c * height_out * width_out);
+        (b * channel_out * height_out * width_out + c * height_out * width_out);
 
     if (num_count > 0) {
-      for (p = 0; p < num_points; p++) {
+      for (int p = 0; p < num_points; p++) {
         const int data_offset_h_ptr = (n * num_points + p) * 2;
         const int data_offset_w_ptr = (n * num_points + p) * 2 + 1;
         const scalar_t h_im = data_sample_offsets_[data_offset_h_ptr];
@@ -253,6 +289,7 @@ __global__ void scatter_inst2img_gpu_kernel(
         if (abs(h_im - h) < 1 && abs(w_im - w) < 1) {
           scalar_t weight =
               get_gradient_weight(h_im, w_im, h, w, height_out, width_out);
+              for
           atomicAdd(
               grad_feature_ + grad_feature_index,
               weight * grad_val / num_count);
@@ -292,7 +329,8 @@ void scatter_inst2img(
     const at::Tensor data_output_count,
     const int num_instance,
     const int num_points,
-    const int channel_out const int height_out,
+    const int channel_out,
+    const int height_out,
     const int width_out,
     at::Tensor grad_feature,
     at::Tensor grad_sample_offsets,
@@ -300,15 +338,15 @@ void scatter_inst2img(
   int num_kernels = num_instance * channel_out * height_out * width_out;
 
   AT_DISPATCH_FLOATING_TYPES_AND_HALF(
-      grad_output.type(), "scatter_inst2img_gpu", ([&] {
+        grad_output.type(), "scatter_inst2img_gpu", ([&] {
         const scalar_t* grad_output_ = grad_output.data<scalar_t>();
         const scalar_t* data_feature_ = data_feature.data<scalar_t>();
         const scalar_t* data_sample_offsets_ =
             data_sample_offsets.data<scalar_t>();
-        const int* data_batch_index_ = data_batch_index.data<int>();
+        const scalar_t* data_batch_index_ = data_batch_index.data<scalar_t>();
         const scalar_t* data_count_ = data_output_count.data<scalar_t>();
         scalar_t* grad_feature_ = grad_feature.data<scalar_t>();
-        scalar_t* grad_sample_offsets_ = grad_sample_offsets<scalar_t>();
+        scalar_t* grad_sample_offsets_ = grad_sample_offsets.data<scalar_t>();
 
         scatter_inst2img_gpu_kernel<<<
             GET_BLOCKS(num_kernels),

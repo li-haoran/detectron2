@@ -21,7 +21,7 @@ class ScatterFeatureFunction(Function):
 
         
 
-        ctx.save_for_backward(feature,sample_offsets)
+        ctx.save_for_backward(feature,sample_offsets,batch_index)
 
 
         output = feature.new_empty(
@@ -35,7 +35,7 @@ class ScatterFeatureFunction(Function):
         else:
            
             assert (sample_offsets.size(2) % 2) == 0, 'sample_offsets channels must be even number'
-            assert batch_index.size(0)==sample_offsets(0),'the num_instance mismath'
+            assert batch_index.size(0)==sample_offsets.size(0),'the num_instance mismath'
             scatter_feature_cuda.scatter_feature_forward_cuda(
                 feature,sample_offsets, batch_index,output,output_count)
         ctx.output_count=output_count
@@ -43,7 +43,7 @@ class ScatterFeatureFunction(Function):
 
     @staticmethod
     def backward(ctx, grad_output):
-        feature,sample_offsets = ctx.saved_tensors
+        feature,sample_offsets,batch_index = ctx.saved_tensors
         output_count=ctx.output_count
 
         grad_feature = grad_sample_offsets =  None
