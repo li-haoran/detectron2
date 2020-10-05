@@ -27,6 +27,17 @@ void scatter_inst2img(
     const int height_out,
     const int width_out,
     at::Tensor grad_feature,
+    const at::Tensor grad_output);
+
+void coord_inst2img(
+    const at::Tensor data_feature,
+    const at::Tensor data_sample_offsets,
+    const at::Tensor data_batch_index,
+    const int num_instance,
+    const int num_points,
+    const int channel_out,
+    const int height_out,
+    const int width_out,
     at::Tensor grad_sample_offsets,
     const at::Tensor grad_output);
 
@@ -55,8 +66,6 @@ void scatter_feature_forward_cuda(
     at::Tensor sample_offsets,
     at::Tensor batch_index,
     at::Tensor output) {
-
-
   shape_check(feature, sample_offsets);
 
   feature = feature.contiguous();
@@ -116,8 +125,21 @@ void scatter_feature_backward_cuda(
       height_out,
       width_out,
       grad_feature,
+      grad_output);
+
+  coord_inst_img(
+      feature,
+      sample_offsets,
+      batch_index,
+      n_instance,
+      n_points,
+      channel_out,
+      height_out,
+      width_out,
       grad_sample_offsets,
       grad_output);
+
+)
 }
 
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {

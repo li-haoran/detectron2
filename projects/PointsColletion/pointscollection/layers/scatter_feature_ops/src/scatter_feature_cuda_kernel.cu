@@ -270,6 +270,125 @@ __global__ void scatter_inst2img_gpu_kernel(
     const int height_out,
     const int width_out,
     scalar_t* grad_feature_,
+    const scalar_t* grad_output_) {
+  CUDA_KERNEL_LOOP(index, n) {
+    // index index of output matrix
+    const int p = index % num_points;
+    const int c = index / num_points % channel_out;
+    const int o = index / num_points / channel_out;
+
+    const int b = data_batch_index_[o];
+
+    const int data_offset_h_index = (o * num_points + p) * 2;
+    const int data_offset_w_index = (o * num_points + p) * 2 + 1;
+    const scalar_t h_im = data_sample_offsets_[data_offset_h_index];
+    const scalar_t w_im = data_sample_offsets_[data_offset_w_index];
+
+    const int grad_output_index =
+        o * channel_out * height_out * width_out + c * height_out * width_out;
+    const scalar_t* grad_output_ptr = grad_output_ + grad_output_index;
+    const int feature_index =
+        b * channel_out * height_out * width_out + c * height_out * width_out;
+    scalar_t* grad_feature_ptr = grad_feature_ + feature_index;
+    const scalar_t* data_feature_ptr = data_feature_ + feature_index;
+
+    if (h_im > -1 && h_im < height_out && w_im > -1 && w_im < width_out) {
+      int h_low = floor(h_im);
+      int w_low = floor(w_im);
+      int h_high = h_low + 1;
+      int w_high = w_low + 1;
+
+      scalar_t mid_grad_feature = bilinear(
+          grad_output_ptr, width_out, height_out, width_out, h_im, w_im);
+
+      // ll
+      if (h_low >= 0 && w_low >= 0) {
+        scalar_t weight = (h_low + 1 - h_im) * (w_low + 1 - w_im);
+        atomicAdd(
+            grad_feature_ptr + h_low * width_out + w_low,
+            weight * mid_grad_feature);
+      }
+
+      // lh
+      if (h_low >= 0 && w_high <= width_out - 1) {
+        scalar_t weight = (h_low + 1 - h_im) * (w_im + 1 - w_high);
+        atomicAdd(
+            grad_feature_ptr + h_low * width_out + w_high,
+            weight * mid_grad_feature);
+      }
+      // hl
+      if (h_high <= height_out - 1 && w_low >= 0) {
+        scalar_t weight = (h_im + 1 - h_high) * (w_low + 1 - w_im);
+        atomicAdd(
+            grad_feature_ptr + h_high * width_out + w_low,
+            weight * mid_grad_feature);
+      }
+      // hh
+      if (h_high <= height_out - 1 && w_high <= width_out - 1) {
+        scalar_t weight = (h_im + 1 - h_high) * (w_im + 1 - w_high);
+        atomicAdd(
+            grad_feature_ptr + h_high * width_out + w_high,
+            weight * mid_grad_feature);
+      }
+    }
+  }
+}
+
+void scatter_inst2img(
+    const at::Tensor data_feature,
+    const at::Tensor data_sample_offsets,
+    const at::Tensor data_batch_index,
+    const int num_instance,
+    const int num_points,
+    const int channel_out,
+    const int height_out,
+    const int width_out,
+    at::Tensor grad_feature,
+    const at::Tensor grad_output) {
+  int num_kernels = num_instance * channel_out * num_points;
+
+  AT_DISPATCH_FLOATING_TYPES_AND_HALF(
+      grad_output.type(), "scatter_inst2img_gpu", ([&] {
+        const scalar_t* grad_output_ = grad_output.data<scalar_t>();
+        const scalar_t* data_feature_ = data_feature.data<scalar_t>();
+        const scalar_t* data_sample_offsets_ =
+            data_sample_offsets.data<scalar_t>();
+        const scalar_t* data_batch_index_ = data_batch_index.data<scalar_t>();
+        scalar_t* grad_feature_ = grad_feature.data<scalar_t>();
+
+        scatter_inst2img_gpu_kernel<<<
+            GET_BLOCKS(num_kernels),
+            CUDA_NUM_THREADS>>>(
+            num_kernels,
+            data_feature_,
+            data_sample_offsets_,
+            data_batch_index_,
+            num_instance,
+            num_points,
+            channel_out,
+            height_out,
+            width_out,
+            grad_feature_,
+            grad_output_);
+      }));
+
+  cudaError_t err = cudaGetLastError();
+  if (err != cudaSuccess) {
+    printf("error in scatter_inst2img: %s\n", cudaGetErrorString(err));
+  }
+}
+
+template <typename scalar_t>
+__global__ void coord_inst2img_gpu_kernel(
+    const int n,
+    const scalar_t* data_feature_,
+    const scalar_t* data_sample_offsets_,
+    const scalar_t* data_batch_index_,
+    const int num_instance,
+    const int num_points,
+    const int channel_out,
+    const int height_out,
+    const int width_out,
     scalar_t* grad_sample_offsets_,
     const scalar_t* grad_output_) {
   CUDA_KERNEL_LOOP(index, n) {
@@ -294,8 +413,8 @@ __global__ void scatter_inst2img_gpu_kernel(
     const scalar_t* data_feature_ptr = data_feature_ + feature_index;
 
     if (h_im > -1 && h_im < height_out && w_im > -1 && w_im < width_out) {
-      // scalar_t h_grad = 0;
-      // scalar_t w_grad = 0;
+      scalar_t h_grad = 0;
+      scalar_t w_grad = 0;
 
       scalar_t h_weight = get_coordinate_weight(
           h_im, w_im, height_out, width_out, data_feature_ptr, width_out, 0);
@@ -307,19 +426,12 @@ __global__ void scatter_inst2img_gpu_kernel(
       int h_high = h_low + 1;
       int w_high = w_low + 1;
 
-      scalar_t mid_grad_feature = bilinear(
-          grad_output_ptr, width_out, height_out, width_out, h_im, w_im);
-
       scalar_t mid_feature = bilinear(
           data_feature_ptr, width_out, height_out, width_out, h_im, w_im);
 
       // ll
       if (h_low >= 0 && w_low >= 0) {
         scalar_t weight = (h_low + 1 - h_im) * (w_low + 1 - w_im);
-        atomicAdd(
-            grad_feature_ptr + h_low * width_out + w_low,
-            weight * mid_grad_feature);
-
         scalar_t h_coor_weight = -1 * (w_low + 1 - w_im);
         scalar_t w_coor_weight = -1 * (h_low + 1 - h_im);
 
@@ -334,10 +446,6 @@ __global__ void scatter_inst2img_gpu_kernel(
       // lh
       if (h_low >= 0 && w_high <= width_out - 1) {
         scalar_t weight = (h_low + 1 - h_im) * (w_im + 1 - w_high);
-        atomicAdd(
-            grad_feature_ptr + h_low * width_out + w_high,
-            weight * mid_grad_feature);
-
         scalar_t h_coor_weight = -1 * (w_im + 1 - w_high);
         scalar_t w_coor_weight = (h_low + 1 - h_im);
 
@@ -351,10 +459,6 @@ __global__ void scatter_inst2img_gpu_kernel(
       // hl
       if (h_high <= height_out - 1 && w_low >= 0) {
         scalar_t weight = (h_im + 1 - h_high) * (w_low + 1 - w_im);
-        atomicAdd(
-            grad_feature_ptr + h_high * width_out + w_low,
-            weight * mid_grad_feature);
-
         scalar_t h_coor_weight = (w_low + 1 - w_im);
         scalar_t w_coor_weight = -1 * (h_im + 1 - h_high);
 
@@ -368,10 +472,6 @@ __global__ void scatter_inst2img_gpu_kernel(
       // hh
       if (h_high <= height_out - 1 && w_high <= width_out - 1) {
         scalar_t weight = (h_im + 1 - h_high) * (w_im + 1 - w_high);
-        atomicAdd(
-            grad_feature_ptr + h_high * width_out + w_high,
-            weight * mid_grad_feature);
-
         scalar_t h_coor_weight = (w_im + 1 - w_high);
         scalar_t w_coor_weight = (h_im + 1 - h_high);
 
@@ -389,7 +489,7 @@ __global__ void scatter_inst2img_gpu_kernel(
   }
 }
 
-void scatter_inst2img(
+void coord_inst2img(
     const at::Tensor data_feature,
     const at::Tensor data_sample_offsets,
     const at::Tensor data_batch_index,
@@ -398,22 +498,20 @@ void scatter_inst2img(
     const int channel_out,
     const int height_out,
     const int width_out,
-    at::Tensor grad_feature,
     at::Tensor grad_sample_offsets,
     const at::Tensor grad_output) {
   int num_kernels = num_instance * channel_out * num_points;
 
   AT_DISPATCH_FLOATING_TYPES_AND_HALF(
-      grad_output.type(), "scatter_inst2img_gpu", ([&] {
+      grad_output.type(), "coord_inst2img_gpu", ([&] {
         const scalar_t* grad_output_ = grad_output.data<scalar_t>();
         const scalar_t* data_feature_ = data_feature.data<scalar_t>();
         const scalar_t* data_sample_offsets_ =
             data_sample_offsets.data<scalar_t>();
         const scalar_t* data_batch_index_ = data_batch_index.data<scalar_t>();
-        scalar_t* grad_feature_ = grad_feature.data<scalar_t>();
         scalar_t* grad_sample_offsets_ = grad_sample_offsets.data<scalar_t>();
 
-        scatter_inst2img_gpu_kernel<<<
+        coord_inst2img_gpu_kernel<<<
             GET_BLOCKS(num_kernels),
             CUDA_NUM_THREADS>>>(
             num_kernels,
@@ -425,13 +523,12 @@ void scatter_inst2img(
             channel_out,
             height_out,
             width_out,
-            grad_feature_,
             grad_sample_offsets_,
             grad_output_);
       }));
 
   cudaError_t err = cudaGetLastError();
   if (err != cudaSuccess) {
-    printf("error in scatter_inst2img: %s\n", cudaGetErrorString(err));
+    printf("error in coord_inst2img: %s\n", cudaGetErrorString(err));
   }
 }
