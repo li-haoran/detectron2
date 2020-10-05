@@ -193,23 +193,23 @@ __global__ void scatter_img2inst_gpu_kernel(
       // ll
       if (h_low >= 0 && w_low >= 0) {
         scalar_t weight = (h_low + 1 - h_im) * (w_low + 1 - w_im);
-        atomic_Add(data_col_ptr + h_low * width_out + w_low, weight * val);
+        atomicAdd(data_col_ptr + h_low * width_out + w_low, weight * val);
       }
 
       // lh
-      if (h_low >= 0 && w_high <= width_out) {
+      if (h_low >= 0 && w_high <= width_out - 1) {
         scalar_t weight = (h_low + 1 - h_im) * (w_im + 1 - w_high);
-        atomic_Add(data_col_ptr + h_low * width_out + w_high, weight * val);
+        atomicAdd(data_col_ptr + h_low * width_out + w_high, weight * val);
       }
       // hl
-      if (h_high <= height_out && w_low >= 0) {
+      if (h_high <= height_out - 1 && w_low >= 0) {
         scalar_t weight = (h_im + 1 - h_high) * (w_low + 1 - w_im);
-        atomic_Add(data_col_ptr + h_high * width_out + w_low, weight * val);
+        atomicAdd(data_col_ptr + h_high * width_out + w_low, weight * val);
       }
       // hh
-      if (h_high <= height_out && w_high <= width_out) {
+      if (h_high <= height_out - 1 && w_high <= width_out - 1) {
         scalar_t weight = (h_im + 1 - h_high) * (w_im + 1 - w_high);
-        atomic_Add(data_col_ptr + h_high * width_out + w_high, weight * val);
+        atomicAdd(data_col_ptr + h_high * width_out + w_high, weight * val);
       }
     }
   }
@@ -294,8 +294,8 @@ __global__ void scatter_inst2img_gpu_kernel(
     const scalar_t* data_feature_ptr = data_feature_ + feature_index;
 
     if (h_im > -1 && h_im < height_out && w_im > -1 && w_im < width_out) {
-      scalar_t h_grad = 0;
-      scalar_t w_grad = 0;
+      // scalar_t h_grad = 0;
+      // scalar_t w_grad = 0;
 
       scalar_t h_weight = get_coordinate_weight(
           h_im, w_im, height_out, width_out, data_feature_ptr, width_out, 0);
@@ -316,12 +316,12 @@ __global__ void scatter_inst2img_gpu_kernel(
       // ll
       if (h_low >= 0 && w_low >= 0) {
         scalar_t weight = (h_low + 1 - h_im) * (w_low + 1 - w_im);
-        atomic_Add(
+        atomicAdd(
             grad_feature_ptr + h_low * width_out + w_low,
             weight * mid_grad_feature);
 
-        scalar_t h_coor_weight = -(w_low + 1 - w_im);
-        scalar_t w_coor_weight = -(h_low + 1 - h_im);
+        scalar_t h_coor_weight = -1 * (w_low + 1 - w_im);
+        scalar_t w_coor_weight = -1 * (h_low + 1 - h_im);
 
         h_grad +=
             ((h_coor_weight * mid_feature + h_weight * weight) *
@@ -332,13 +332,13 @@ __global__ void scatter_inst2img_gpu_kernel(
       }
 
       // lh
-      if (h_low >= 0 && w_high <= width_out) {
+      if (h_low >= 0 && w_high <= width_out - 1) {
         scalar_t weight = (h_low + 1 - h_im) * (w_im + 1 - w_high);
-        atomic_Add(
+        atomicAdd(
             grad_feature_ptr + h_low * width_out + w_high,
             weight * mid_grad_feature);
 
-        scalar_t h_coor_weight = -(w_im + 1 - w_high);
+        scalar_t h_coor_weight = -1 * (w_im + 1 - w_high);
         scalar_t w_coor_weight = (h_low + 1 - h_im);
 
         h_grad +=
@@ -349,14 +349,14 @@ __global__ void scatter_inst2img_gpu_kernel(
              grad_feature_ptr[h_low * width_out + w_high]);
       }
       // hl
-      if (h_high <= height_out && w_low >= 0) {
+      if (h_high <= height_out - 1 && w_low >= 0) {
         scalar_t weight = (h_im + 1 - h_high) * (w_low + 1 - w_im);
-        atomic_Add(
+        atomicAdd(
             grad_feature_ptr + h_high * width_out + w_low,
             weight * mid_grad_feature);
 
         scalar_t h_coor_weight = (w_low + 1 - w_im);
-        scalar_t w_coor_weight = -(h_im + 1 - h_high);
+        scalar_t w_coor_weight = -1 * (h_im + 1 - h_high);
 
         h_grad +=
             ((h_coor_weight * mid_feature + h_weight * weight) *
@@ -366,9 +366,9 @@ __global__ void scatter_inst2img_gpu_kernel(
              grad_feature_ptr[h_high * width_out + w_low]);
       }
       // hh
-      if (h_high <= height_out && w_high <= width_out) {
+      if (h_high <= height_out - 1 && w_high <= width_out - 1) {
         scalar_t weight = (h_im + 1 - h_high) * (w_im + 1 - w_high);
-        atomic_Add(
+        atomicAdd(
             grad_feature_ptr + h_high * width_out + w_high,
             weight * mid_grad_feature);
 
@@ -384,7 +384,7 @@ __global__ void scatter_inst2img_gpu_kernel(
       }
 
       grad_sample_offsets_[data_offset_h_index] = h_grad;
-      grad_sample_offsets_[data_offest_w_index] = w_grad;
+      grad_sample_offsets_[data_offset_w_index] = w_grad;
     }
   }
 }

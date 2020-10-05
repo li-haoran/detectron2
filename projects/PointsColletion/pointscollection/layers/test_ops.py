@@ -103,9 +103,12 @@ def example_pcp():
 def check_scatter():
     N=2
     inC=1
-    feature = torch.rand(N, inC, 64, 64).double().cuda()
-    sample_offsets=torch.rand(2,16,2).double().cuda()*30
-    batch_index=torch.tensor([1,2]).double().cuda()
+    feature = torch.rand(N, inC, 5, 5).double().cuda()
+    # feature[0]=0.5
+    # feature[1]=1
+    sample_offsets=torch.rand(3,2,2).double().cuda()*4
+    # sample_offsets[:]=0.5
+    batch_index=torch.tensor([0,1,0]).double().cuda()
 
     feature.requires_grad = True
     feature.retain_grad()
@@ -117,7 +120,7 @@ def check_scatter():
 
 
     output=scatter_feature(feature,sample_offsets,batch_index)
-    print(sample_offsets,batch_index,output)
+    print(feature,sample_offsets,batch_index,output)
     print('check_gradient_sf: ',
           gradcheck(scatter_feature, (feature,sample_offsets,batch_index),
                     ))#eps=1e-3, atol=1e-4, rtol=1e-2
