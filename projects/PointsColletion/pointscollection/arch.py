@@ -20,7 +20,7 @@ from detectron2.utils.logger import log_first_n
 
 from pointscollection.head import PointsCollectionHead,ClsHead
 from pointscollection.data import Targets,_postprocess
-from pointscollection.loss import chamfer_loss,normlize_chamfer_loss
+from pointscollection.loss import chamfer_loss,normlize_chamfer_loss,emd_l1_loss
 
 import matplotlib.pyplot as plt
 
@@ -282,7 +282,8 @@ class PointsCollection(nn.Module):
         # loss_mask=chamfer_loss(pred_points_valids_contour,gt_masks)*self.mask_loss_weight
 
         #normlized chamfer distance
-        loss_mask=normlize_chamfer_loss(pred_points_valids_contour,gt_masks,max_side=max_side)*self.mask_loss_weight
+        # loss_mask=normlize_chamfer_loss(pred_points_valids_contour,gt_masks,max_side=max_side)*self.mask_loss_weight
+        loss_mask=emd_l1_loss(pred_points,gt_masks)*self.mask_loss_weight
         
         losses["loss_mask"] = loss_mask
         return losses

@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F 
+from pointscollection.layers.emd import emd_function
 
 
 def chamfer_loss(pred_points,gt_points):
@@ -50,14 +51,20 @@ def normlize_chamfer_loss(pred_points,gt_points,max_side=32):
     tran_pt_points=torch.transpose(pred_points,1,3)
     gather_pt_points=torch.gather(tran_pt_points,3,rep_min_index_pt)
 
-    dist1=torch.sum((pred_points-gather_gt_points)**2,dim=2).squeeze()
-    dist2=torch.sum((gather_pt_points-gt_points)**2,dim=2).squeeze()
+    # dist1=torch.sum((pred_points-gather_gt_points)**2,dim=2).squeeze()
+    # dist1=F._smooth_l1_loss(pred_points,gather_gt_points).squeeze(3)
+    # dist2=torch.sum((gather_pt_points-gt_points)**2,dim=2).squeeze()
+    # dist2=F._smooth_l1_loss(gather_pt_points,gt_points).squeeze(1)
+    # dist1=torch.sum((pred_points-gather_gt_points)**2,dim=2).squeeze()
+    # dist2=torch.sum((gather_pt_points-gt_points)**2,dim=2).squeeze()
+    dist1=torch.abs(pred_points-gather_gt_points).squeeze()
+    dist2=torch.abs(gather_pt_points-gt_points).squeeze()
 
-    dist1=dist1.mean(-1)
+    dist1=dist1.mean(-2)
     dist2=dist2.mean(-1)
     dist=(dist1+dist2)/2.0
 
-    return torch.mean(dist)   
+    return torch.mean(dist)    
         
 
 def outlier_loss(pred_points,gt_points,contour_size=81):
@@ -126,4 +133,33 @@ def normlize_chamfer_loss_with_outlier_penalty(pred_points,gt_points,contour_siz
     dist=(dist1+dist2)/2.0
 
     return torch.mean(dist),torch.mean(outlier_penalty)   
+
+
+def emd_loss(pred_points,gt_points,eps=0.005,iters=50):
+
+    pred_points=pred_points.squeeze(3)
+    gt_points=gt_points.squeeze(1)
+    gt_points=gt_points.transpose(1,2)
+
+    dist,_=emd_function(pred_points,gt_points,eps,iters)
+
+    return torch.mean(dist)
+
+
+def emd_l1_loss(pred_points,gt_points,eps=0.005,iters=50):
+
+    pred_points=pred_points.squeeze(3)
+    gt_points=gt_points.squeeze(1)
+    gt_points=gt_points.transpose(1,2)
+
+    _,assignment=emd_function(pred_points,gt_points,eps,iters)
+
+    assignment=assignment.unsqueeze(2)
+    assignment=assignment.repeat(1,1,2)
+    gt_points=torch.gather(gt_points,1,assignment)
+
+    dist=torch.abs(x1-x2)
+    dist=dist.mean(-1)
+
+    return torch.mean(dist)
 
