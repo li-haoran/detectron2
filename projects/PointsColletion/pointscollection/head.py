@@ -96,3 +96,72 @@ class ClsHead(nn.Module):
 
         pred_logits = self.cls_score(self.cls_subnet(x)) 
         return pred_logits
+
+from pointscollection.layers.scatter_feature_ops import ScatterFeaturePack
+
+class instanceMask(nn.Module):
+    def __init__(self,cfg,input_shape: ShapeSpec):
+        super(instanceMask,self).__init__()
+
+        in_channels             = input_shape[0].channels
+        ins_channels            = cfg.MODEL.POINTS_COLLECTION.INS_CHANNELS
+        num_convs               = cfg.MODEL.POINTS_COLLECTION.INS_NUM_CONVS
+
+        subnet=[]
+        cur_channels=in_channels
+        for _ in range(num_convs):
+            subnet.append(
+                nn.Conv2d(cur_channels, ins_channels, kernel_size=3, stride=1, padding=1)
+            )
+            cur_channels = ins_channels
+            subnet.append(nn.ReLU(inplace=True))
+
+        self.subnet = nn.Sequential(*subnet)
+        self.score = nn.Conv2d(
+            cur_channels,  1, kernel_size=3, stride=1, padding=1
+        )
+
+        
+        
+    def forward(self,f,locations,batch_indexs):
+
+        '''
+        f: b x c x h x w
+        locations: n x 729 x 2 (y,x)
+        batch_indexs: n 
+        '''
+        # global
+        b,c,h,w=f.size()
+        n=batch_indexs.size(0)
+        new_f=torch.index_select(f,0,batch_indexs)
+
+        new_location=locations.unsqueeze(1)
+        gy=2*new_location[:,:,:,0]/(h-1)-1
+        gx=2*new_location[:,:,:,1]/(w-1)-1
+
+        grid=torch.stack([gx,gy],dim=3)
+
+        sampled_f=F.grid_sample(new_f,grid).squeeze(2)
+        sampled_f_tran=torch.transpose(sampled_f,1,2)
+        new_f=new_f.view(n,c,h*w)
+        
+        score=torch.bmm(sampled_f_tran,new_f)
+        score=F.softmax(score,dim=1)
+
+        final_f=torch.bmm(sampled_f,score)
+        final_f=final_f.view(n,c,h,w)
+
+
+
+        nf=self.subnet(final_f)
+        ns=self.score(nf)
+
+        return ns
+
+
+
+
+
+
+
+
