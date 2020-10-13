@@ -155,10 +155,10 @@ def emd_l1_loss(pred_points,gt_points,eps=0.005,iters=50):
     _,assignment=emd_function(pred_points,gt_points,eps,iters)
 
     assignment=assignment.unsqueeze(2)
-    assignment=assignment.repeat(1,1,2)
+    assignment=assignment.repeat(1,1,2).long()
     gt_points=torch.gather(gt_points,1,assignment)
 
-    dist=torch.abs(x1-x2)
+    dist=torch.abs(pred_points-gt_points)
     dist=dist.mean(-1)
 
     return torch.mean(dist)

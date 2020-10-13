@@ -283,7 +283,7 @@ class PointsCollection(nn.Module):
 
         #normlized chamfer distance
         # loss_mask=normlize_chamfer_loss(pred_points_valids_contour,gt_masks,max_side=max_side)*self.mask_loss_weight
-        loss_mask=emd_l1_loss(pred_points,gt_masks)*self.mask_loss_weight
+        loss_mask=emd_l1_loss(pred_points_valids_contour,gt_masks)*self.mask_loss_weight
         
         losses["loss_mask"] = loss_mask
         return losses
