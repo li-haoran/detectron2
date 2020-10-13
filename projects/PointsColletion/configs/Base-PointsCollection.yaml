@@ -7,8 +7,6 @@ MODEL:
     OUT_FEATURES: ["res3", "res4", "res5"]
     DEFORM_ON_PER_STAGE: [False, True, True, True] # on Res3,Res4,Res5
     DEFORM_MODULATED: False
-  POINTS_COLLECTION:
-    MASK_ON: True
 
 DATASETS:
   TRAIN: ("coco_2017_train",)

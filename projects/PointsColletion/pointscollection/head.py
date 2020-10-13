@@ -146,7 +146,8 @@ class instanceMask(nn.Module):
         new_f=new_f.view(n,c,h*w)
         
         score=torch.bmm(sampled_f_tran,new_f)
-        score=F.softmax(score,dim=1)
+        score=F.sigmoid(score)
+
 
         final_f=torch.bmm(sampled_f,score)
         final_f=final_f.view(n,c,h,w)
