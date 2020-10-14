@@ -1,9 +1,9 @@
 _BASE_: "Base-PointsCollectionIns.yaml"
 MODEL:
-  WEIGHTS: "detectron2://ImageNetPretrained/MSRA/R-50.pkl"
+  WEIGHTS: "./output/ntest6/model_final.pth"
   RESNETS:
     DEPTH: 50
 SOLVER:
-  BASE_LR: 0.002
+  BASE_LR: 0.00002
   STEPS: (120000, 160000)
   MAX_ITER: 180000

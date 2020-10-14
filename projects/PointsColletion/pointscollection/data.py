@@ -271,8 +271,9 @@ def _postprocess(results, output_height, output_width,):
     pred_points[:,:, 1].clamp_(min=0, max=h)
 
     if results.has('pred_masks'):
-        pred_masks=results.pred_masks
-        pred_masks=torch.nn.functional.interpolate(pred_masks,(output_height, output_width),mode='nearst')
+        old_pred_masks=results.pred_masks
+        pred_masks=old_pred_masks.new_zeros((old_pred_masks.size(0),output_height,output_width))
+        pred_masks[:,:,:]=old_pred_masks[:,:output_height,:output_width]
     else:
         pred_masks=points_to_masks(pred_points,results.image_size)
     

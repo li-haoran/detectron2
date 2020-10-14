@@ -133,6 +133,7 @@ class instanceMask(nn.Module):
         # global
         b,c,h,w=f.size()
         n=batch_indexs.size(0)
+        # print('n instance:{}'.format(n))
         new_f=torch.index_select(f,0,batch_indexs)
 
         new_location=locations.unsqueeze(1)
@@ -146,7 +147,9 @@ class instanceMask(nn.Module):
         new_f=new_f.view(n,c,h*w)
         
         score=torch.bmm(sampled_f_tran,new_f)
-        score=F.sigmoid(score)
+        score=torch.sigmoid(score)
+        # temp_ns=torch.sum(score,dim=1).view(n,1,h,w)
+        
 
 
         final_f=torch.bmm(sampled_f,score)

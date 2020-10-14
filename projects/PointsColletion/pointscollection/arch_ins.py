@@ -45,6 +45,7 @@ class PointsCollectionIns(nn.Module):
         self.focal_loss_gamma         = cfg.MODEL.POINTS_COLLECTION.FOCAL_LOSS_GAMMA
 
         self.mask_loss_weight         =cfg.MODEL.POINTS_COLLECTION.MASK_LOSS_WEIGHT
+        self.ins_loss_weight          =cfg.MODEL.POINTS_COLLECTION.INS_LOSS_WEIGHT
         self.circumscribed            =cfg.MODEL.POINTS_COLLECTION.CIRCUM
 
         self.score_threshold          = cfg.MODEL.POINTS_COLLECTION.SCORE_THRESH_TEST
@@ -65,6 +66,7 @@ class PointsCollectionIns(nn.Module):
 
         self.ins_features           =cfg.MODEL.POINTS_COLLECTION.PIN_FEATURES
         ins_features_shape=[backbone_shape[f] for f in self.ins_features]
+        self.ins_feature_strides = [x.stride for x in ins_features_shape]
         self.ins_head=instanceMask(cfg,ins_features_shape)
 
         self.target_generator=Targets(cfg,self.points_feature_strides[-1],self.classify_feature_strides[-1])
@@ -184,14 +186,14 @@ class PointsCollectionIns(nn.Module):
                 gt_clses,
                 gt_belongs,
                 gt_masks,
-                gt_ins
+                gt_ins,
                 pred_digits,
                 pred_points,
                 ins_features[0]
             )
         else:
             # do inference to get the output
-            results = self.inference(pred_digits, pred_points,images)
+            results = self.inference(pred_digits, pred_points,ins_features[0],images)
             # plt.imshow(np.max(pred_digits[0].cpu().numpy(),0))
             # plt.show()
             # self.visualize_training(batched_inputs,results)
@@ -265,7 +267,8 @@ class PointsCollectionIns(nn.Module):
         pred_points_valids=pred_points_valids.view(N,P//2,2,1)
 
         Q=gt_masks.size(1)
-        location=(gt_masks+gt_belongs[:,1:].view(N,1,2))*4
+        location=(gt_masks+gt_belongs[:,1:].view(N,1,2))*self.classify_feature_strides[-1]/self.ins_feature_strides[0]
+        location=location.float()
         
         gt_masks=gt_masks.view(N,1,Q,2)
 
@@ -278,10 +281,10 @@ class PointsCollectionIns(nn.Module):
 
 
         pred_ins=self.ins_head(ins_feature,location,batch_index)
-        _,_,h,w=gt_ins.size()
-        mask=F.interpolate(pred_ins,(h,w),mode='bilinear')
+        # _,_,h,w=gt_ins.size()
+        pred_ins=F.interpolate(pred_ins,scale_factor=self.ins_feature_strides[0],mode='bilinear').squeeze(1)
 
-        loss_ins=F.binary_cross_entropy_with_logits(mask,gt_ins)
+        loss_ins=F.binary_cross_entropy_with_logits(pred_ins,gt_ins)*self.ins_loss_weight
         losses['loss_ins'] = loss_ins
 
         # print(pred_points_valids_contour.size(),gt_masks.size())
@@ -296,7 +299,7 @@ class PointsCollectionIns(nn.Module):
         return losses
 
     @torch.no_grad()
-    def get_ground_truth(self, targets,output_size):
+    def get_ground_truth(self, targets,output_size,):
         """
         Args:
 
@@ -313,10 +316,12 @@ class PointsCollectionIns(nn.Module):
         gt_clses=[]
         gt_belongs=[]
         gt_masks=[]
+        gt_ins=[]
+        ins_size=[output_size[-2]*32,output_size[-1]*32]
         for it,target_im in enumerate(targets):
             classes=target_im.gt_classes
             masks=target_im.gt_masks       
-            gt_cls,gt_belong,gt_mask=self.target_generator.get_target_single(classes,masks,output_size)
+            gt_cls,gt_belong,gt_mask,gt_in=self.target_generator.get_target_single(classes,masks,output_size)
 
             batch_index=np.zeros((gt_belong.shape[0],1),dtype=np.int64)+it
             gt_belong_batch=np.concatenate([batch_index,gt_belong],axis=1)
@@ -324,6 +329,11 @@ class PointsCollectionIns(nn.Module):
             gt_clses.append(gt_cls)
             gt_belongs.append(gt_belong_batch)
             gt_masks.append(gt_mask)
+            gt_in=torch.from_numpy(gt_in)
+            this_shape=(gt_in.size(0),ins_size[0],ins_size[1])
+            new_gt_in = gt_in.new_full(this_shape, 0) 
+            new_gt_in[..., : gt_in.size(1), : gt_in.size(2)].copy_(gt_in)
+            gt_ins.append(new_gt_in)
 
         gt_clses=np.stack(gt_clses)
         gt_clses=torch.from_numpy(gt_clses).to(device=self.device)
@@ -335,13 +345,17 @@ class PointsCollectionIns(nn.Module):
         gt_masks=np.concatenate(gt_masks)
         gt_masks=torch.from_numpy(gt_masks).to(device=self.device)
 
+        gt_ins=torch.cat(gt_ins).float().to(device=self.device)
+
         N=gt_belongs.size(0)
-        if N>1024:
-            index=torch.randperm(N)[:1024]
+        if N>32:
+            index=torch.randperm(N)[:32]
             gt_masks=gt_masks[index,:,:]
             gt_belongs=gt_belongs[index,:]
+            gt_ins=gt_ins[index,:,:]
+        
 
-        return [gt_clses_binary,gt_belongs,gt_masks]
+        return [gt_clses_binary,gt_belongs,gt_masks,gt_ins]
        
 
     def inference(self, pred_digits,pred_points,ins_feature,images):
@@ -410,13 +424,13 @@ class PointsCollectionIns(nn.Module):
             npoints=npoints.view(N,-1,2)
             real_npoints=npoints+center
 
-            location=real_npoints[:,:,(1,0)]*4
+            real_npoints=real_npoints*self.points_feature_strides[-1]
+
+            location=(real_npoints[:,:,(1,0)]/self.ins_feature_strides[0]).float()
             batch_index=Index.new_zeros(N)+img_idx
             pred_ins=self.ins_head(ins_feature,location,batch_index)
-            pred_ins=F.interpolate(pred_ins,image_size,mode='bilinear')
+            pred_ins=F.interpolate(pred_ins,scale_factor=self.ins_feature_strides[0],mode='bilinear').squeeze(1)
             pred_masks=(pred_ins>0.5)
-
-            real_npoints=real_npoints*self.points_feature_strides[-1]
 
             top_left,_=torch.min(real_npoints,dim=1)
             bottom_right,_=torch.max(real_npoints,dim=1)
