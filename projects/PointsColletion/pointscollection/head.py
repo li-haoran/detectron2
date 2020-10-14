@@ -98,6 +98,7 @@ class ClsHead(nn.Module):
         return pred_logits
 
 from pointscollection.layers.scatter_feature_ops import ScatterFeaturePack
+import matplotlib.pyplot as plt
 
 class instanceMask(nn.Module):
     def __init__(self,cfg,input_shape: ShapeSpec):
@@ -142,13 +143,19 @@ class instanceMask(nn.Module):
 
         grid=torch.stack([gx,gy],dim=3)
 
+        yy,xx=torch.meshgrid(torch.arange(0,h),torch.arange(0,w))
+        anchor=torch.stack([yy,xx],dim=2).view(1,h*w,1,2).to(grid.device)
+
+        spatial_weight=torch.exp(-torch.sum((new_location-anchor)**2,3)/(5**2))
+        spatial_weight=spatial_weight.transpose(1,2)
         sampled_f=F.grid_sample(new_f,grid).squeeze(2)
         sampled_f_tran=torch.transpose(sampled_f,1,2)
         new_f=new_f.view(n,c,h*w)
         
         score=torch.bmm(sampled_f_tran,new_f)
         score=torch.sigmoid(score)
-        # temp_ns=torch.sum(score,dim=1).view(n,1,h,w)
+        score=score*spatial_weight
+        # temp_ns=torch.sum(score,dim=1).view(n,1,h,w) 
         
 
 

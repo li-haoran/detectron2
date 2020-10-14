@@ -196,7 +196,7 @@ class PointsCollectionIns(nn.Module):
             results = self.inference(pred_digits, pred_points,ins_features[0],images)
             # plt.imshow(np.max(pred_digits[0].cpu().numpy(),0))
             # plt.show()
-            # self.visualize_training(batched_inputs,results)
+            self.visualize_training(batched_inputs,results)
             processed_results = []
             for results_im, input_im, image_size in zip(
                 results, batched_inputs, images.image_sizes
@@ -348,8 +348,8 @@ class PointsCollectionIns(nn.Module):
         gt_ins=torch.cat(gt_ins).float().to(device=self.device)
 
         N=gt_belongs.size(0)
-        if N>32:
-            index=torch.randperm(N)[:32]
+        if N>16:
+            index=torch.randperm(N)[:16]
             gt_masks=gt_masks[index,:,:]
             gt_belongs=gt_belongs[index,:]
             gt_ins=gt_ins[index,:,:]
