@@ -104,7 +104,7 @@ class instanceMask(nn.Module):
     def __init__(self,cfg,input_shape: ShapeSpec):
         super(instanceMask,self).__init__()
 
-        in_channels             = input_shape[0].channels
+        in_channels             = input_shape[0].channels+1
         ins_channels            = cfg.MODEL.POINTS_COLLECTION.INS_CHANNELS
         num_convs               = cfg.MODEL.POINTS_COLLECTION.INS_NUM_CONVS
 
@@ -150,18 +150,18 @@ class instanceMask(nn.Module):
         spatial_weight=spatial_weight.transpose(1,2)
         sampled_f=F.grid_sample(new_f,grid).squeeze(2)
         sampled_f_tran=torch.transpose(sampled_f,1,2)
-        new_f=new_f.view(n,c,h*w)
+        new_f_v=new_f.view(n,c,h*w)
         
-        score=torch.bmm(sampled_f_tran,new_f)
+        score=torch.bmm(sampled_f_tran,new_f_v)
         score=torch.sigmoid(score)
         score=score*spatial_weight
-        # temp_ns=torch.sum(score,dim=1).view(n,1,h,w) 
+        temp_ns=torch.sum(score,dim=1).view(n,1,h,w) 
         
 
 
-        final_f=torch.bmm(sampled_f,score)
-        final_f=final_f.view(n,c,h,w)
-
+        # final_f=torch.bmm(sampled_f,score)
+        # final_f=final_f.view(n,c,h,w)
+        final_f=torch.cat([temp_ns,new_f],dim=1)
 
 
         nf=self.subnet(final_f)

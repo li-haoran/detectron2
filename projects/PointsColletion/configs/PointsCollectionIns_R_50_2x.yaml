@@ -1,6 +1,6 @@
 _BASE_: "Base-PointsCollectionIns.yaml"
 MODEL:
-  WEIGHTS: "./output/ntest6/model_final.pth"
+  WEIGHTS: "./output/ntest8/model_final.pth"
   RESNETS:
     DEPTH: 50
 SOLVER:

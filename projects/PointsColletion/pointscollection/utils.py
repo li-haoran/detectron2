@@ -167,8 +167,8 @@ class exVisualizer(Visualizer):
         else:
             return np.asarray(points)
     def draw_points(self,points,color=(0.0,0.0,0.0)):
-        tri = Delaunay(points)
-        self.output.ax.triplot(points[:,0], points[:,1], tri.simplices,color=color)
+        # tri = Delaunay(points)
+        # self.output.ax.triplot(points[:,0], points[:,1], tri.simplices,color=color)
         self.output.ax.plot(points[:,0], points[:,1], 'o',color=color)
 
         # for idx, point in enumerate(points):
