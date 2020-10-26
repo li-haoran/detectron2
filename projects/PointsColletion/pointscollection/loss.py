@@ -5,7 +5,7 @@ from pointscollection.layers.emd import emd_function
 
 
 def chamfer_loss(pred_points,gt_points):
-    p2pdistance=torch.sum((pred_points-gt_points)**2,dim=2)
+    p2pdistance=torch.sum(torch.abs((pred_points-gt_points)),dim=2)
     dist1,_=torch.min(p2pdistance,dim=1)
     dist2,_=torch.min(p2pdistance,dim=2)
 

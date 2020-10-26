@@ -20,7 +20,7 @@ from detectron2.utils.logger import log_first_n
 
 from pointscollection.head import PointsCollectionHead,ClsHead
 from pointscollection.data import Targets,_postprocess
-from pointscollection.loss import chamfer_loss,normlize_chamfer_loss,emd_l1_loss
+from pointscollection.loss import chamfer_loss,normlize_chamfer_loss,emd_l1_loss,emd_loss
 
 import matplotlib.pyplot as plt
 
@@ -279,13 +279,13 @@ class PointsCollection(nn.Module):
 
         # print(pred_points_valids_contour.size(),gt_masks.size())
         #chamfer distance:
-        # loss_mask=chamfer_loss(pred_points_valids_contour,gt_masks)*self.mask_loss_weight
+        # loss_mask1=chamfer_loss(pred_points_valids_contour,gt_masks)*self.mask_loss_weight
 
         #normlized chamfer distance
-        # loss_mask=normlize_chamfer_loss(pred_points_valids_contour,gt_masks,max_side=max_side)*self.mask_loss_weight
-        loss_mask=emd_l1_loss(pred_points_valids_contour,gt_masks)*self.mask_loss_weight
+        loss_mask1=normlize_chamfer_loss(pred_points_valids_contour,gt_masks,max_side=max_side)*self.mask_loss_weight
+        loss_mask2=emd_l1_loss(pred_points_valids_contour,gt_masks)*self.mask_loss_weight
         
-        losses["loss_mask"] = loss_mask
+        losses["loss_mask"] = loss_mask1+loss_mask2
         return losses
 
     @torch.no_grad()
@@ -329,8 +329,8 @@ class PointsCollection(nn.Module):
         gt_masks=torch.from_numpy(gt_masks).to(device=self.device)
 
         N=gt_belongs.size(0)
-        if N>1024:
-            index=torch.randperm(N)[:1024]
+        if N>64:
+            index=torch.randperm(N)[:64]
             gt_masks=gt_masks[index,:,:]
             gt_belongs=gt_belongs[index,:]
 
