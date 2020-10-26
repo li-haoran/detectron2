@@ -255,6 +255,7 @@ def _postprocess(results, output_height, output_width,):
     Returns:
         Instances: the postprocessed output from the model, based on the output resolution
     """
+    # old_image_size=results.image_size
     scale_x, scale_y = (output_width / results.image_size[1], output_height / results.image_size[0])
     results = Instances((output_height, output_width), **results.get_fields())
 
@@ -272,8 +273,8 @@ def _postprocess(results, output_height, output_width,):
 
     if results.has('pred_masks'):
         old_pred_masks=results.pred_masks
-        pred_masks=old_pred_masks.new_zeros((old_pred_masks.size(0),output_height,output_width))
-        pred_masks[:,:,:]=old_pred_masks[:,:output_height,:output_width]
+        pred_masks=torch.nn.functional.interpolate(old_pred_masks.unsqueeze(1).float(),(output_height,output_width),mode='nearest').bool().squeeze(1)
+        # print(old_pred_masks.size(),pred_masks.size())
     else:
         pred_masks=points_to_masks(pred_points,results.image_size)
     

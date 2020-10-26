@@ -166,6 +166,9 @@ class PointsCollectionIns(nn.Module):
         # print(images.image_sizes)
         # print(images.tensor.size())
         features = self.backbone(images.tensor)
+        # for k,v in features.items():
+        #     plt.imshow(v[0].squeeze().mean(0).cpu().numpy())
+        #     plt.show()
         classify_features = [features[f][0] for f in self.cin_features]
         points_features =[features[f][1] for f in self.pin_features]
         ins_features=[features[f][0] for f in self.ins_features]
@@ -431,6 +434,9 @@ class PointsCollectionIns(nn.Module):
             pred_ins=self.ins_head(ins_feature,location,batch_index)
             pred_ins=F.interpolate(pred_ins,scale_factor=self.ins_feature_strides[0],mode='bilinear').squeeze(1)
             pred_masks=(pred_ins>0.5)
+
+            #crop to the image size:
+            pred_masks=pred_masks[:,:image_size[0],:image_size[1]]
 
             top_left,_=torch.min(real_npoints,dim=1)
             bottom_right,_=torch.max(real_npoints,dim=1)
