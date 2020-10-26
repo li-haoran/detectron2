@@ -81,6 +81,10 @@ class ResNet2(ResNet):
             if "linear" in self._out_features:
                 outputs["linear"] = x
         return outputs
+    @property
+    def size_divisibility(self):
+        return 32
+        
     @staticmethod
     def make_stage(block_class, num_blocks, block_info, first_stride,*, in_channels, out_channels,norm,**kwargs):
             """

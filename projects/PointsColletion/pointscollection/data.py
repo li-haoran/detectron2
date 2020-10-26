@@ -15,6 +15,7 @@ class Targets:
         self.num_class=cfg.MODEL.POINTS_COLLECTION.NUM_CLASSES
         self.sigma=cfg.MODEL.POINTS_COLLECTION.SIGMA
         self.contour=cfg.MODEL.POINTS_COLLECTION.CONTOUR
+        self.mask_on=cfg.MODEL.POINTS_COLLECTION.MASK_ON
         assert self.pc_stride==self.cls_stride,"cls stride should be equal to pc's!"
 
     def get_target_single(self,classes,bitmask,output_size):
@@ -60,6 +61,9 @@ class Targets:
         pc_target_belongs=np.concatenate(belongs) if len(belongs)>0 else np.zeros((0,2),dtype=np.int64)
         # pc_target_belongs=np.int64(pc_target_belongs)
         pc_target_offsets=np.concatenate(offsets) if len(offsets)>0 else np.zeros((0,self.contour,2),dtype=np.float32)
+
+        if self.mask_on:
+            return cls_target,pc_target_belongs,pc_target_offsets,bitmask
 
         return cls_target,pc_target_belongs,pc_target_offsets
 
@@ -266,7 +270,13 @@ def _postprocess(results, output_height, output_width,):
     pred_points[:,:, 0].clamp_(min=0, max=w)
     pred_points[:,:, 1].clamp_(min=0, max=h)
 
-    pred_masks=points_to_masks(pred_points,results.image_size)
+    if results.has('pred_masks'):
+        old_pred_masks=results.pred_masks
+        pred_masks=old_pred_masks.new_zeros((old_pred_masks.size(0),output_height,output_width))
+        pred_masks[:,:,:]=old_pred_masks[:,:output_height,:output_width]
+    else:
+        pred_masks=points_to_masks(pred_points,results.image_size)
+    
 
     results.pred_masks = pred_masks
     # results.pred_points = pred_points
