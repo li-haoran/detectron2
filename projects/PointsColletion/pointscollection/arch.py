@@ -385,7 +385,7 @@ class PointsCollection(nn.Module):
 
             N=center.size(0)
             # print(N)
-            TOPK=20
+            TOPK=100
             if N>TOPK:
                 pred_prob, topk_idxs = pred_prob.sort(descending=True)
                 # Keep top k scoring values
