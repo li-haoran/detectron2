@@ -6,7 +6,7 @@ from detectron2.structures import Boxes,Instances
 
 import matplotlib.pyplot as plt
 
-CONTOUR_SIZE=81
+CONTOUR_SIZE=81*3
 class Targets:
     def __init__(self,cfg,pc_stride,cls_stride):
         

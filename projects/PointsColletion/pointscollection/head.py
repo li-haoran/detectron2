@@ -97,6 +97,44 @@ class ClsHead(nn.Module):
         pred_logits = self.cls_score(self.cls_subnet(x)) 
         return pred_logits
 
+
+class pointRefine(nn.Module):
+    def __init__(self,cfg,input_shape:ShapeSpec):
+        super(pointRefine,self).__init__()
+        in_channels             = input_shape[0].channels
+
+        self.m=nn.Sequential(nn.Linear(in_channels,256),
+                            nn.ReLU(True),
+                            nn.Linear(256,2))
+
+
+    def forward(self,f,locations,batch_indexs):
+        '''
+        f: b x c x h x w
+        locations: n x 729 x 2 (y,x)
+        batch_indexs: n 
+        '''
+        # global
+        b,c,h,w=f.size()
+        n=batch_indexs.size(0)
+        # print('n instance:{}'.format(n))
+        new_f=torch.index_select(f,0,batch_indexs)
+
+        new_location=locations.unsqueeze(1)
+        gy=2*new_location[:,:,:,0]/(h-1)-1
+        gx=2*new_location[:,:,:,1]/(w-1)-1
+
+        grid=torch.stack([gx,gy],dim=3)
+
+        sampled_f=F.grid_sample(new_f,grid).squeeze(2)
+        sampled_f_tran=torch.transpose(sampled_f,1,2)
+
+        points=self.m(sampled_f_tran)
+
+        return points
+
+
+
 from pointscollection.layers.scatter_feature_ops import ScatterFeaturePack
 import matplotlib.pyplot as plt
 
