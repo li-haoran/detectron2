@@ -163,3 +163,17 @@ def emd_l1_loss(pred_points,gt_points,eps=0.005,iters=50):
 
     return torch.mean(dist)
 
+def emd_l1_loss2(pred_points,gt_points,eps=0.005,iters=50):
+
+    pred_points=pred_points.squeeze(3)
+    gt_points=gt_points.squeeze(1)
+    gt_points=gt_points.transpose(1,2)
+
+    _,assignment=emd_function(pred_points,gt_points,eps,iters)
+
+    assignment=assignment.unsqueeze(2)
+    assignment=assignment.repeat(1,1,2).long()
+    gt_points=torch.gather(gt_points,1,assignment)
+
+
+    return dist

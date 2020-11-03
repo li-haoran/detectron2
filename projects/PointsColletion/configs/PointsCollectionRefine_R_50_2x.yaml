@@ -1,0 +1,10 @@
+_BASE_: "Base-PointsCollectionRefine.yaml"
+MODEL:
+  WEIGHTS: "./output/test12/model_final.pth"
+  RESNETS:
+    DEPTH: 50
+SOLVER:
+  IMS_PER_BATCH: 8
+  BASE_LR: 0.00002
+  STEPS: (120000, 160000)
+  MAX_ITER: 180000
