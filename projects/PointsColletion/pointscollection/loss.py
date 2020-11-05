@@ -175,5 +175,5 @@ def emd_l1_loss2(pred_points,gt_points,eps=0.005,iters=50):
     assignment=assignment.repeat(1,1,2).long()
     gt_points=torch.gather(gt_points,1,assignment)
 
-
+    dist=torch.abs(pred_points-gt_points)
     return dist

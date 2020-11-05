@@ -48,6 +48,7 @@ class PointsCollectionRefine(nn.Module):
         self.ins_loss_weight          =cfg.MODEL.POINTS_COLLECTION.INS_LOSS_WEIGHT
         self.circumscribed            =cfg.MODEL.POINTS_COLLECTION.CIRCUM
 
+        self.score_threshold          = cfg.MODEL.POINTS_COLLECTION.SCORE_THRESH_TEST
 
         # build the backbone
         self.backbone = build_backbone(cfg)
@@ -271,6 +272,7 @@ class PointsCollectionRefine(nn.Module):
         
         
         pred_points_valids=pred_points_valids.view(N,P//2,2,1)
+        Q=gt_masks.size(1)        
         gt_masks=gt_masks.view(N,1,Q,2)
 
         gt_masks=gt_masks.transpose(2,3)
@@ -290,7 +292,7 @@ class PointsCollectionRefine(nn.Module):
         loss_mask2=torch.mean(dist)
 
         points_delta=self.ins_head(ins_feature,location,batch_index)
-        contour_weight=torch.zeros_like(points_delta)
+        contour_weight=torch.zeros_like(points_delta)+0.1
         contour_weight[:,:81*3,:]=1
         loss_delta=torch.mean(torch.abs(points_delta-dist)*contour_weight)
         
