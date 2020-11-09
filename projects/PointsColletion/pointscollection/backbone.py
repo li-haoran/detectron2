@@ -14,22 +14,114 @@ from detectron2.modeling.backbone.resnet import BasicStem, BottleneckBlock,Defor
 
 __all__ = [ "build_points_collection_resnet_backbone","DeformbleOffsetBottleneckBlock","ResNet2"]
 
-class DeformbleOffsetBottleneckBlock(DeformBottleneckBlock):
+class DeformbleOffsetBottleneckBlock(CNNBlockBase):
     def __init__(self, in_channels, out_channels, *,bottleneck_channels, stride=1, num_groups=1, norm='BN', stride_in_1x1=False, dilation=1, deform_modulated=False, deform_num_groups=1):
-        super(DeformbleOffsetBottleneckBlock,self).__init__(in_channels, out_channels, bottleneck_channels=bottleneck_channels, stride=stride, num_groups=num_groups, norm=norm, stride_in_1x1=stride_in_1x1, dilation=dilation, deform_modulated=deform_modulated, deform_num_groups=deform_num_groups)
+        super().__init__(in_channels, out_channels, stride)
+        self.deform_modulated = deform_modulated
 
+        if in_channels != out_channels:
+            self.shortcut = Conv2d(
+                in_channels,
+                out_channels,
+                kernel_size=1,
+                stride=stride,
+                bias=False,
+                norm=get_norm(norm, out_channels),
+            )
+        else:
+            self.shortcut = None
+
+        stride_1x1, stride_3x3 = (stride, 1) if stride_in_1x1 else (1, stride)
+
+        self.conv1 = Conv2d(
+            in_channels,
+            bottleneck_channels,
+            kernel_size=1,
+            stride=stride_1x1,
+            bias=False,
+            norm=get_norm(norm, bottleneck_channels),
+        )
+
+        if deform_modulated:
+            deform_conv_op = ModulatedDeformConv
+            # offset channels are 2 or 3 (if with modulated) * kernel_size * kernel_size
+            offset_channels = 27
+        else:
+            deform_conv_op = DeformConv
+            offset_channels = 18
+
+        self.buffer_offset=nn.Sequential(
+            Conv2d(
+                bottleneck_channels,
+                bottleneck_channels,
+                kernel_size=(5,1),
+                stride=stride_3x3,
+                padding=(2*dilation,0),
+                dilation=dilation,
+            ),
+            Conv2d(
+                bottleneck_channels,
+                bottleneck_channels,
+                kernel_size=(1,5),
+                stride=stride_3x3,
+                padding=(0,2*dilation),
+                dilation=dilation,
+            ),
+            nn.ReLU(inplace=True)
+
+        )
+
+        self.conv2_offset = Conv2d(
+            bottleneck_channels,
+            offset_channels * deform_num_groups,
+            kernel_size=3,
+            stride=stride_3x3,
+            padding=1 * dilation,
+            dilation=dilation,
+        )
+        self.conv2 = deform_conv_op(
+            bottleneck_channels,
+            bottleneck_channels,
+            kernel_size=3,
+            stride=stride_3x3,
+            padding=1 * dilation,
+            bias=False,
+            groups=num_groups,
+            dilation=dilation,
+            deformable_groups=deform_num_groups,
+            norm=get_norm(norm, bottleneck_channels),
+        )
+
+        self.conv3 = Conv2d(
+            bottleneck_channels,
+            out_channels,
+            kernel_size=1,
+            bias=False,
+            norm=get_norm(norm, out_channels),
+        )
+
+        for layer in [self.conv1, self.conv2, self.conv3, self.shortcut]:
+            if layer is not None:  # shortcut can be None
+                weight_init.c2_msra_fill(layer)
+
+        nn.init.constant_(self.conv2_offset.weight, 0)
+        nn.init.constant_(self.conv2_offset.bias, 0)
+
+    
     def forward(self, x):
         out = self.conv1(x)
         out = F.relu_(out)
 
         if self.deform_modulated:
-            offset_mask = self.conv2_offset(out)
+            offset_buffer=self.buffer_offset(out)
+            offset_mask = self.conv2_offset(offset_buffer)
             offset_x, offset_y, mask = torch.chunk(offset_mask, 3, dim=1)
             offset = torch.cat((offset_x, offset_y), dim=1)
             mask = mask.sigmoid()
             out = self.conv2(out, offset, mask)
         else:
-            offset = self.conv2_offset(out)
+            offset_buffer=self.buffer_offset(out)
+            offset = self.conv2_offset(offset_buffer)
             out = self.conv2(out, offset)
         out = F.relu_(out)
 
