@@ -187,39 +187,39 @@ class ResNet2(ResNet):
         
     @staticmethod
     def make_stage(block_class, num_blocks, block_info, first_stride,*, in_channels, out_channels,norm,**kwargs):
-            """
-            Create a list of blocks of the same type that forms one ResNet stage.
-            Layers that produce the same feature map spatial size are defined as one
-            "stage" by :paper:`FPN`.
+        """
+        Create a list of blocks of the same type that forms one ResNet stage.
+        Layers that produce the same feature map spatial size are defined as one
+        "stage" by :paper:`FPN`.
 
-            Args:
-                block_class (type): a subclass of CNNBlockBase that's used to create all blocks in this
-                    stage. A module of this type must not change spatial resolution of inputs unless its
-                    stride != 1.
-                num_blocks (int): number of blocks in this stage
-                first_stride (int): the stride of the first block. The other blocks will have stride=1.
-                    Therefore this is also the stride of the entire stage.
-                in_channels (int): input channels of the entire stage.
-                out_channels (int): output channels of **every block** in the stage.
-                kwargs: other arguments passed to the constructor of `block_class`.
+        Args:
+            block_class (type): a subclass of CNNBlockBase that's used to create all blocks in this
+                stage. A module of this type must not change spatial resolution of inputs unless its
+                stride != 1.
+            num_blocks (int): number of blocks in this stage
+            first_stride (int): the stride of the first block. The other blocks will have stride=1.
+                Therefore this is also the stride of the entire stage.
+            in_channels (int): input channels of the entire stage.
+            out_channels (int): output channels of **every block** in the stage.
+            kwargs: other arguments passed to the constructor of `block_class`.
 
-            Returns:
-                list[nn.Module]: a list of block module.
-            """
-            assert "stride" not in kwargs, "Stride of blocks in make_stage cannot be changed."
-            blocks = []
-            for i in range(num_blocks):
-                blocks.append(
-                    block_class[i](
-                        in_channels=in_channels,
-                        out_channels=out_channels,
-                        stride=first_stride if i == 0 else 1,
-                        norm=norm,
-                        **block_info[i],
-                    )
+        Returns:
+            list[nn.Module]: a list of block module.
+        """
+        assert "stride" not in kwargs, "Stride of blocks in make_stage cannot be changed."
+        blocks = []
+        for i in range(num_blocks):
+            blocks.append(
+                block_class[i](
+                    in_channels=in_channels,
+                    out_channels=out_channels,
+                    stride=first_stride if i == 0 else 1,
+                    norm=norm,
+                    **block_info[i],
                 )
-                in_channels = out_channels
-            return blocks
+            )
+            in_channels = out_channels
+        return blocks
 
 
 @BACKBONE_REGISTRY.register()
