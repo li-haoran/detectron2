@@ -2,8 +2,10 @@ import numpy as np
 import fvcore.nn.weight_init as weight_init
 import torch.nn.functional as F
 from torch import nn
+import torch
+from torch.nn.modules.utils import _pair
 
-from detectron2.layers import CNNBlockBase, Conv2d, ShapeSpec, get_norm
+from detectron2.layers import CNNBlockBase,ShapeSpec,Conv2d,get_norm,FrozenBatchNorm2d
 
 from detectron2.layers.deform_conv import deform_conv
 from detectron2.modeling import Backbone,BACKBONE_REGISTRY
@@ -15,7 +17,27 @@ cfgs = {
     19: [64,64,"M",128,128,"M",256,256,256,256,"M",512,512,512,512,"M",512,512,512,512,"M"],
 }
 
-class DeformConv2(nn.Module):
+class Conv2d2(Conv2d):
+    """
+    A wrapper around :class:`torch.nn.Conv2d` to support empty inputs and more features.
+    """
+    def freeze(self):
+        """
+        Make this block not trainable.
+        This method sets all parameters to `requires_grad=False`,
+        and convert all BatchNorm layers to FrozenBatchNorm
+
+        Returns:
+            the block itself
+        """
+        for p in self.parameters():
+            p.requires_grad = False
+        FrozenBatchNorm2d.convert_frozen_batchnorm(self)
+        return self
+
+
+
+class DeformConv2(CNNBlockBase):
     def __init__(
         self,
         in_channels,
@@ -40,9 +62,8 @@ class DeformConv2(nn.Module):
             norm (nn.Module, optional): a normalization layer
             activation (callable(Tensor) -> Tensor): a callable activation function
         """
-        super(DeformConv2, self).__init__()
+        super(DeformConv2, self).__init__(in_channels,out_channels,stride)
 
-        assert not bias
         assert in_channels % groups == 0, "in_channels {} cannot be divisible by groups {}".format(
             in_channels, groups
         )
@@ -73,13 +94,24 @@ class DeformConv2(nn.Module):
         if self.bias is not None:
             nn.init.constant_(self.bias, 0)
 
+        bottleneck_channels=in_channels//2
+        offset_channels=2*kernel_size**2
 
         self.buffer_offset=nn.Sequential(
+            Conv2d(
+                in_channels,
+                bottleneck_channels,
+                kernel_size=1,
+                stride=1,
+                padding=0,
+                dilation=1,
+            ),
+            nn.ReLU(inplace=True),
             Conv2d(
                 bottleneck_channels,
                 bottleneck_channels,
                 kernel_size=(5,1),
-                stride=stride_3x3,
+                stride=stride,
                 padding=(2*dilation,0),
                 dilation=dilation,
             ),
@@ -87,7 +119,7 @@ class DeformConv2(nn.Module):
                 bottleneck_channels,
                 bottleneck_channels,
                 kernel_size=(1,5),
-                stride=stride_3x3,
+                stride=stride,
                 padding=(0,2*dilation),
                 dilation=dilation,
             ),
@@ -97,9 +129,9 @@ class DeformConv2(nn.Module):
 
         self.conv2_offset = Conv2d(
             bottleneck_channels,
-            offset_channels * deform_num_groups,
+            offset_channels * deformable_groups,
             kernel_size=3,
-            stride=stride_3x3,
+            stride=stride,
             padding=1 * dilation,
             dilation=dilation,
         )
@@ -109,21 +141,8 @@ class DeformConv2(nn.Module):
 
 
     def forward(self, x):
-        if x.numel() == 0:
-            # When input is empty, we want to return a empty tensor with "correct" shape,
-            # So that the following operations will not panic
-            # if they check for the shape of the tensor.
-            # This computes the height and width of the output tensor
-            output_shape = [
-                (i + 2 * p - (di * (k - 1) + 1)) // s + 1
-                for i, p, di, k, s in zip(
-                    x.shape[-2:], self.padding, self.dilation, self.kernel_size, self.stride
-                )
-            ]
-            output_shape = [x.shape[0], self.weight.shape[0]] + output_shape
-            return _NewEmptyTensorOp.apply(x, output_shape)
-
-        offset_buffer=self.buffer_offset(out)
+   
+        offset_buffer=self.buffer_offset(x)
         offset = self.conv2_offset(offset_buffer)
         out = deform_conv(
             x,
@@ -135,6 +154,9 @@ class DeformConv2(nn.Module):
             self.groups,
             self.deformable_groups,
         )
+        if self.bias is not None:
+            bias=self.bias.view(1,-1,1,1)
+            out+=bias
         if self.norm is not None:
             out = self.norm(out)
         if self.activation is not None:
@@ -150,7 +172,7 @@ class DeformConv2(nn.Module):
         tmpstr += ", dilation=" + str(self.dilation)
         tmpstr += ", groups=" + str(self.groups)
         tmpstr += ", deformable_groups=" + str(self.deformable_groups)
-        tmpstr += ", bias="+str(self.bias)
+        tmpstr += ", bias="+str(True)
         return tmpstr
 
 
@@ -175,7 +197,7 @@ class VGG(Backbone):
             self.stages_and_names.append((stage, name))
 
             self._out_feature_strides[name] = current_stride = int(
-                current_stride * 2)
+                current_stride * 2
             )
             self._out_feature_channels[name] = block[-1].out_channels
 
@@ -208,6 +230,8 @@ class VGG(Backbone):
     def forward(self, x):
         outputs = {}
         for stage, name in self.stages_and_names:
+            # convert ccp to pcc for 
+            x=F.max_pool2d(x,kernel_size=2, stride=2)
             x = stage(x)
             if name in self._out_features:
                 outputs[name] = x
@@ -234,14 +258,14 @@ class VGG(Backbone):
                 for block in stage.children():
                     block.freeze()
         return self
-
+    @property
+    def size_divisibility(self):
+        return 32
     @staticmethod
-    def make_stage(block_class, in_channels, out_channels,pool,norm,activation):
-        assert "stride" not in kwargs, "Stride of blocks in make_stage cannot be changed."
+    def make_stage(block_class, in_channels, out_channels,norm):
         blocks = []
+        num_blocks=len(block_class)
         for i in range(num_blocks):
-            # convert  ccp to pcc make the feature map small
-            blocks.append(nn.MaxPool2d(kernel_size=2,stride=2))
             blocks.append(
                 block_class[i](
                     in_channels=in_channels[i],
@@ -249,9 +273,9 @@ class VGG(Backbone):
                     kernel_size=3,
                     stride=1,
                     padding=1,
-                    bias=False,
+                    bias=True,
                     norm=get_norm(norm, out_channels[i]),
-                    activation=activation
+                    activation=nn.ReLU(True)
                 )
             )
 
@@ -281,16 +305,15 @@ def build_points_collection_vgg_backbone(cfg, input_shape):
 
         channel_cfg=cfgs[depth][ind : stage_inds[idx]]
 
-        if deform_on_per_stage[idx-1]:
-            block_class=[Conv2d for i in range(len(channel_cfg)-1)]+[DeformConv2]
+        if deform_on_per_stage[idx]:
+            block_class=[Conv2d2 for i in range(len(channel_cfg)-1)]+[DeformConv2]
         else:
-            block_class=[Conv2d for i in range(len(channel_cfg))]
+            block_class=[Conv2d2 for i in range(len(channel_cfg))]
         stage_kargs = {
-            "block_class": block_class
+            "block_class": block_class,
             "in_channels": [in_channels]+channel_cfg[:-1],
-            "out_channel": channel_cfg,
+            "out_channels": channel_cfg,
             "norm": norm,
-            "pool": pool,
         }
 
         blocks = VGG.make_stage(**stage_kargs)

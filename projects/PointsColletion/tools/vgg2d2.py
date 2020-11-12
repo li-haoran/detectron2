@@ -15,11 +15,11 @@ def convert(path1,path2,depth='D',bn=True):
     bn_dict={}
     k=0
     s=1
-    sk=1
+    sk=0
     for i,x in enumerate(cfgs[depth]):
         if x=='M':
             s+=1
-            sk=1
+            sk=0
             k+=1
         else:
             conv_dict[k]=(s,sk)
@@ -38,10 +38,10 @@ def convert(path1,path2,depth='D',bn=True):
             id=int(k.split('.')[1])
             if id in conv_dict:
                 stage_id,tmp=conv_dict[id]
-                k = k.replace("features.{}".format(id), "vgg_block{}.{}".format(stage_id,tmp))
+                k = k.replace("features.{}".format(id), "res{}.{}".format(stage_id,tmp))
             elif id in bn_dict:
                 stage_id,tmp=bn_dict[id]
-                k=k.replace("features.{}".format(id), "vgg_block{}.{}.bn".format(stage_id,tmp))
+                k=k.replace("features.{}".format(id), "res{}.{}.norm".format(stage_id,tmp))
 
         print(old_k, "->", k)
         newmodel[k] = obj.pop(old_k).detach().numpy()

@@ -2,7 +2,7 @@ _BASE_: "Base-PointsCollection.yaml"
 MODEL:
   BACKBONE:
     NAME: "build_points_collection_vgg_backbone"
-  WEIGHTS: ".tools/vgg16_d2.pth"
+  WEIGHTS: "./tools/vgg16_d2.pkl"
   VGG:
     DEPTH: 16
 SOLVER:
