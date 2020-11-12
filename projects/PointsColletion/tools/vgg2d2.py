@@ -15,11 +15,11 @@ def convert(path1,path2,depth='D',bn=True):
     bn_dict={}
     k=0
     s=1
-    sk=0
+    sk=1
     for i,x in enumerate(cfgs[depth]):
         if x=='M':
             s+=1
-            sk=0
+            sk=1
             k+=1
         else:
             conv_dict[k]=(s,sk)

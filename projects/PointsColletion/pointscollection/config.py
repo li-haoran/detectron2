@@ -39,3 +39,17 @@ def add_pointscollection_config(cfg):
 
 
     cfg.INPUT.MASK_FORMAT = "bitmask" 
+
+
+
+    cfg.MODEL.VGG = CN()
+
+    cfg.MODEL.VGG.DEPTH = 16
+    cfg.MODEL.VGG.OUT_FEATURES = ["res3","res4","res5"]
+
+    # Options: FrozenBN, GN, "SyncBN", "BN"
+    cfg.MODEL.VGG.NORM = "FrozenBN"
+
+    # Output channels of conv5 block
+    cfg.MODEL.VGG.CONV5_OUT_CHANNELS = 512
+    cfg.MODEL.VGG.DEFORM_ON_PER_STAGE=[False,False,True,True,True]
