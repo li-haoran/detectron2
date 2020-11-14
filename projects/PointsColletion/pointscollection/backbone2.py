@@ -231,7 +231,7 @@ class VGG(Backbone):
         outputs = {}
         for stage, name in self.stages_and_names:
             # convert ccp to pcc for 
-            x=F.max_pool2d(x,kernel_size=2, stride=2)
+            x=F.avg_pool2d(x,kernel_size=2, stride=2)
             x = stage(x)
             if name in self._out_features:
                 outputs[name] = x
