@@ -28,11 +28,14 @@ def build_Pt_collect_train_aug(cfg):
     ]
     if cfg.INPUT.CROP.ENABLED:
         augs.append(
-            T.RandomCrop_CategoryAreaConstraint(
+            T.RandomCrop(
                 cfg.INPUT.CROP.TYPE,
                 cfg.INPUT.CROP.SIZE,
-                cfg.INPUT.CROP.SINGLE_CATEGORY_MAX_AREA,
-                cfg.MODEL.SEM_SEG_HEAD.IGNORE_VALUE,
+            )
+        )
+        augs.append(
+            T.RandomRotation(
+                angle=[-10,10],
             )
         )
     augs.append(T.RandomFlip())

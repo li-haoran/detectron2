@@ -89,7 +89,7 @@ class PointsCollection(nn.Module):
             results
         ), "Cannot visualize inputs and results of different sizes"
         # storage = get_event_storage()
-        max_boxes = 20
+        max_boxes = 100
 
         image_index = 0  # only visualize a single image
         img = batched_inputs[image_index]["image"]
@@ -187,7 +187,7 @@ class PointsCollection(nn.Module):
             results = self.inference(pred_digits, pred_points,images)
             # plt.imshow(np.max(pred_digits[0].cpu().numpy(),0))
             # plt.show()
-            # self.visualize_training(batched_inputs,results)
+            self.visualize_training(batched_inputs,results)
             processed_results = []
             for results_im, input_im, image_size in zip(
                 results, batched_inputs, images.image_sizes

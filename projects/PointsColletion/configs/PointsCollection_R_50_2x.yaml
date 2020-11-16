@@ -10,4 +10,5 @@ SOLVER:
 INPUT:
   CROP:
     ENABLED: True
-    SINGLE_CATEGORY_MAX_AREA: 1.0
+    TYPE: "relative_range"
+    SIZE: [0.95,0.95]

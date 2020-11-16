@@ -168,7 +168,7 @@ class ResNet2(ResNet):
         x = self.stem(x)
         if "stem" in self._out_features:
             outputs["stem"] = x
-        for stage, name in self.stages_and_names:
+        for name, stage in zip(self.stage_names, self.stages):
             x = stage(x)
             if name in self._out_features:
                 outputs[name] = x
