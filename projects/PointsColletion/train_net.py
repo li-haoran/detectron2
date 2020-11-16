@@ -17,6 +17,27 @@ from detectron2.evaluation import COCOEvaluator, verify_results
 
 from pointscollection import add_pointscollection_config
 
+from detectron2.data import DatasetMapper, MetadataCatalog, build_detection_train_loader
+import detectron2.data.transforms as T
+
+def build_Pt_collect_train_aug(cfg):
+    augs = [
+        T.ResizeShortestEdge(
+            cfg.INPUT.MIN_SIZE_TRAIN, cfg.INPUT.MAX_SIZE_TRAIN, cfg.INPUT.MIN_SIZE_TRAIN_SAMPLING
+        )
+    ]
+    if cfg.INPUT.CROP.ENABLED:
+        augs.append(
+            T.RandomCrop_CategoryAreaConstraint(
+                cfg.INPUT.CROP.TYPE,
+                cfg.INPUT.CROP.SIZE,
+                cfg.INPUT.CROP.SINGLE_CATEGORY_MAX_AREA,
+                cfg.MODEL.SEM_SEG_HEAD.IGNORE_VALUE,
+            )
+        )
+    augs.append(T.RandomFlip())
+    return augs
+
 
 class Trainer(DefaultTrainer):
     @classmethod
@@ -24,6 +45,14 @@ class Trainer(DefaultTrainer):
         if output_folder is None:
             output_folder = os.path.join(cfg.OUTPUT_DIR, "inference")
         return COCOEvaluator(dataset_name, cfg, True, output_folder)
+
+    @classmethod
+    def build_train_loader(cls, cfg):
+        if "PointsCollection" in cfg.MODEL.META_ARCHITECTURE:
+            mapper = DatasetMapper(cfg, is_train=True, augmentations=build_Pt_collect_train_aug(cfg))
+        else:
+            mapper = None
+        return build_detection_train_loader(cfg, mapper=mapper)
 
 
 def setup(args):
