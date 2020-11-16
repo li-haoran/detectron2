@@ -1,4 +1,4 @@
-# Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
+# Copyright (c) Facebook, Inc. and its affiliates.
 import math
 from typing import List
 import torch
@@ -22,16 +22,10 @@ class BufferList(nn.Module):
     Similar to nn.ParameterList, but for buffers
     """
 
-    def __init__(self, buffers=None):
+    def __init__(self, buffers):
         super(BufferList, self).__init__()
-        if buffers is not None:
-            self.extend(buffers)
-
-    def extend(self, buffers):
-        offset = len(self)
         for i, buffer in enumerate(buffers):
-            self.register_buffer(str(offset + i), buffer)
-        return self
+            self.register_buffer(str(i), buffer)
 
     def __len__(self):
         return len(self._buffers)
@@ -89,7 +83,7 @@ class DefaultAnchorGenerator(nn.Module):
     "Faster R-CNN: Towards Real-Time Object Detection with Region Proposal Networks".
     """
 
-    box_dim: int = 4
+    box_dim: torch.jit.Final[int] = 4
     """
     the dimension of each anchor box.
     """
@@ -140,6 +134,7 @@ class DefaultAnchorGenerator(nn.Module):
         return BufferList(cell_anchors)
 
     @property
+    @torch.jit.unused
     def num_cell_anchors(self):
         """
         Alias of `num_anchors`.
@@ -147,6 +142,7 @@ class DefaultAnchorGenerator(nn.Module):
         return self.num_anchors
 
     @property
+    @torch.jit.unused
     def num_anchors(self):
         """
         Returns:
@@ -166,7 +162,9 @@ class DefaultAnchorGenerator(nn.Module):
             list[Tensor]: #featuremap tensors, each is (#locations x #cell_anchors) x 4
         """
         anchors = []
-        for size, stride, base_anchors in zip(grid_sizes, self.strides, self.cell_anchors):
+        # buffers() not supported by torchscript. use named_buffers() instead
+        buffers: List[torch.Tensor] = [x[1] for x in self.cell_anchors.named_buffers()]
+        for size, stride, base_anchors in zip(grid_sizes, self.strides, buffers):
             shift_x, shift_y = _create_grid_offsets(size, stride, self.offset, base_anchors.device)
             shifts = torch.stack((shift_x, shift_y, shift_x, shift_y), dim=1)
 

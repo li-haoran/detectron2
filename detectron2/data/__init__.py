@@ -1,4 +1,4 @@
-# Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
+# Copyright (c) Facebook, Inc. and its affiliates.
 from . import transforms  # isort:skip
 
 from .build import (
@@ -9,7 +9,7 @@ from .build import (
     load_proposals_into_dataset,
     print_instances_class_histogram,
 )
-from .catalog import DatasetCatalog, MetadataCatalog
+from .catalog import DatasetCatalog, MetadataCatalog, Metadata
 from .common import DatasetFromList, MapDataset
 from .dataset_mapper import DatasetMapper
 

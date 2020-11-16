@@ -10,18 +10,21 @@ post according to this template:
 
 ## Instructions To Reproduce the Issue:
 
-1. what code you wrote or what changes you made (`git diff`)
+Check https://stackoverflow.com/help/minimal-reproducible-example for how to ask good questions.
+Simplify the steps to reproduce the issue using suggestions from the above link, and provide them below:
+
+1. Full runnable code or full changes you made:
 ```
-<put diff or code here>
+If making changes to the project itself, please use output of the following command:
+git rev-parse HEAD; git diff
+
+<put code or diff here>
 ```
-2. what exact command you run:
-3. what you observed (including __full logs__):
+2. What exact command you run:
+3. __Full logs__ you observed:
 ```
 <put logs here>
 ```
-4. please simplify the steps as much as possible so they do not require additional resources to
-	 run, such as a private dataset.
-   See https://stackoverflow.com/help/minimal-reproducible-example for how to ask good questions.
 
 ## Expected behavior:
 

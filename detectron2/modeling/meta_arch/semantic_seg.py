@@ -1,4 +1,4 @@
-# Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
+# Copyright (c) Facebook, Inc. and its affiliates.
 import numpy as np
 from typing import Dict
 import fvcore.nn.weight_init as weight_init
@@ -52,8 +52,9 @@ class SemanticSegmentor(nn.Module):
                    * "image": Tensor, image in (C, H, W) format.
                    * "sem_seg": semantic segmentation ground truth
                    * Other information that's included in the original dicts, such as:
-                     "height", "width" (int): the output resolution of the model, used in inference.
-                     See :meth:`postprocess` for details.
+                     "height", "width" (int): the output resolution of the model (may be different
+                     from input resolution), used in inference.
+
 
         Returns:
             list[dict]:

@@ -4,9 +4,7 @@ instant_test_output
 inference_test_output
 
 
-*.jpg
 *.png
-*.txt
 *.json
 *.diff
 
@@ -14,6 +12,7 @@ inference_test_output
 __pycache__
 _ext
 *.pyc
+*.pyd
 *.so
 detectron2.egg-info/
 build/
@@ -38,9 +37,11 @@ wheels/
 # editor settings
 .idea
 .vscode
+_darcs
 
 # project dirs
 /detectron2/model_zoo/configs
-/datasets
+/datasets/*
+!/datasets/*.*
 /projects/*/datasets
 /models

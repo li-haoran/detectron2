@@ -1,4 +1,4 @@
-# Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
+# Copyright (c) Facebook, Inc. and its affiliates.
 import copy
 import logging
 import os
@@ -7,10 +7,8 @@ from caffe2.proto import caffe2_pb2
 from torch import nn
 
 from detectron2.config import CfgNode as CN
+from detectron2.utils.file_io import PathManager
 
-from .caffe2_export import export_caffe2_detection_model
-from .caffe2_export import export_onnx_model as export_onnx_model_impl
-from .caffe2_export import run_and_save_graph
 from .caffe2_inference import ProtobufDetectionModel
 from .caffe2_modeling import META_ARCH_CAFFE2_EXPORT_TYPE_MAP, convert_batched_inputs_to_c2_format
 from .shared import get_pb_arg_vali, get_pb_arg_vals, save_graph
@@ -102,12 +100,14 @@ class Caffe2Tracer:
     def export_caffe2(self):
         """
         Export the model to Caffe2's protobuf format.
-        The returned object can be saved with `.save_protobuf()` method.
+        The returned object can be saved with ``.save_protobuf()`` method.
         The result can be loaded and executed using Caffe2 runtime.
 
         Returns:
             Caffe2Model
         """
+        from .caffe2_export import export_caffe2_detection_model
+
         model, inputs = self._get_traceable()
         predict_net, init_net = export_caffe2_detection_model(model, inputs)
         return Caffe2Model(predict_net, init_net)
@@ -117,18 +117,21 @@ class Caffe2Tracer:
         Export the model to ONNX format.
         Note that the exported model contains custom ops only available in caffe2, therefore it
         cannot be directly executed by other runtime. Post-processing or transformation passes
-        may be applied on the model to accommodate different runtimes.
+        may be applied on the model to accommodate different runtimes, but we currently do not
+        provide support for them.
 
         Returns:
             onnx.ModelProto: an onnx model.
         """
+        from .caffe2_export import export_onnx_model as export_onnx_model_impl
+
         model, inputs = self._get_traceable()
         return export_onnx_model_impl(model, (inputs,))
 
     def export_torchscript(self):
         """
-        Export the model to a `torch.jit.TracedModule` by tracing.
-        The returned object can be saved to a file by ".save()".
+        Export the model to a ``torch.jit.TracedModule`` by tracing.
+        The returned object can be saved to a file by ``.save()``.
 
         Returns:
             torch.jit.TracedModule: a torch TracedModule
@@ -137,7 +140,7 @@ class Caffe2Tracer:
         logger = logging.getLogger(__name__)
         logger.info("Tracing the model with torch.jit.trace ...")
         with torch.no_grad():
-            return torch.jit.trace(model, (inputs,), optimize=True)
+            return torch.jit.trace(model, (inputs,))
 
 
 def export_caffe2_model(cfg, model, inputs):
@@ -164,7 +167,9 @@ def export_onnx_model(cfg, model, inputs):
     Export a detectron2 model to ONNX format.
     Note that the exported model contains custom ops only available in caffe2, therefore it
     cannot be directly executed by other runtime. Post-processing or transformation passes
-    may be applied on the model to accommodate different runtimes.
+    may be applied on the model to accommodate different runtimes, but we currently do not
+    provide support for them.
+
     Args:
         cfg (CfgNode): a detectron2 config, with extra export-related options
             added by :func:`add_export_config`.
@@ -182,6 +187,13 @@ def export_onnx_model(cfg, model, inputs):
 class Caffe2Model(nn.Module):
     """
     A wrapper around the traced model in caffe2's pb format.
+
+    Examples:
+    ::
+        model = Caffe2Model.load_protobuf("dir/with/pb/files")
+        inputs = [{"image": img_tensor_CHW}]
+        outputs = model(inputs)
+
     """
 
     def __init__(self, predict_net, init_net):
@@ -190,6 +202,8 @@ class Caffe2Model(nn.Module):
         self._predict_net = predict_net
         self._init_net = init_net
         self._predictor = None
+
+    __init__.__HIDE_SPHINX_DOC__ = True
 
     @property
     def predict_net(self):
@@ -207,8 +221,6 @@ class Caffe2Model(nn.Module):
         """
         return self._init_net
 
-    __init__.__HIDE_SPHINX_DOC__ = True
-
     def save_protobuf(self, output_dir):
         """
         Save the model as caffe2's protobuf format.
@@ -218,13 +230,14 @@ class Caffe2Model(nn.Module):
         """
         logger = logging.getLogger(__name__)
         logger.info("Saving model to {} ...".format(output_dir))
-        os.makedirs(output_dir, exist_ok=True)
+        if not PathManager.exists(output_dir):
+            PathManager.mkdirs(output_dir)
 
-        with open(os.path.join(output_dir, "model.pb"), "wb") as f:
+        with PathManager.open(os.path.join(output_dir, "model.pb"), "wb") as f:
             f.write(self._predict_net.SerializeToString())
-        with open(os.path.join(output_dir, "model.pbtxt"), "w") as f:
+        with PathManager.open(os.path.join(output_dir, "model.pbtxt"), "w") as f:
             f.write(str(self._predict_net))
-        with open(os.path.join(output_dir, "model_init.pb"), "wb") as f:
+        with PathManager.open(os.path.join(output_dir, "model_init.pb"), "wb") as f:
             f.write(self._init_net.SerializeToString())
 
     def save_graph(self, output_file, inputs=None):
@@ -238,6 +251,8 @@ class Caffe2Model(nn.Module):
                 shape of every tensor. The shape information will be
                 saved together with the graph.
         """
+        from .caffe2_export import run_and_save_graph
+
         if inputs is None:
             save_graph(self._predict_net, output_file, op_only=False)
         else:
@@ -259,11 +274,11 @@ class Caffe2Model(nn.Module):
             Caffe2Model: the caffe2 model loaded from this directory.
         """
         predict_net = caffe2_pb2.NetDef()
-        with open(os.path.join(dir, "model.pb"), "rb") as f:
+        with PathManager.open(os.path.join(dir, "model.pb"), "rb") as f:
             predict_net.ParseFromString(f.read())
 
         init_net = caffe2_pb2.NetDef()
-        with open(os.path.join(dir, "model_init.pb"), "rb") as f:
+        with PathManager.open(os.path.join(dir, "model_init.pb"), "rb") as f:
             init_net.ParseFromString(f.read())
 
         return Caffe2Model(predict_net, init_net)
@@ -271,11 +286,12 @@ class Caffe2Model(nn.Module):
     def __call__(self, inputs):
         """
         An interface that wraps around a caffe2 model and mimics detectron2's models'
-        input & output format. This is used to compare the outputs of caffe2 model
-        with its original torch model.
+        input/output format. See details about the format at :doc:`/tutorials/models`.
+        This is used to compare the outputs of caffe2 model with its original torch model.
 
-        Due to the extra conversion between torch/caffe2,
-        this method is not meant for benchmark.
+        Due to the extra conversion between torch/caffe2, this method is not meant for
+        benchmark. Because of the conversion, this method also has dependency
+        on detectron2 in order to convert to detectron2's output format.
         """
         if self._predictor is None:
             self._predictor = ProtobufDetectionModel(self._predict_net, self._init_net)
