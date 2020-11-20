@@ -187,7 +187,7 @@ class PointsCollection(nn.Module):
             results = self.inference(pred_digits, pred_points,images)
             # plt.imshow(np.max(pred_digits[0].cpu().numpy(),0))
             # plt.show()
-            self.visualize_training(batched_inputs,results)
+            # self.visualize_training(batched_inputs,results)
             processed_results = []
             for results_im, input_im, image_size in zip(
                 results, batched_inputs, images.image_sizes
