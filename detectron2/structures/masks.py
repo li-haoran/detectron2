@@ -26,7 +26,10 @@ def polygons_to_bitmask(polygons: List[np.ndarray], height: int, width: int) -> 
     Returns:
         ndarray: a bool mask of shape (height, width)
     """
-    assert len(polygons) > 0, "COCOAPI does not support empty polygons"
+    if len(polygons) <1:
+        # USER(LI haoran): for random crop or random rotation .etc the polygons may be empty.
+        return np.zeros((height,width)).astype(np.bool)
+    # assert len(polygons) > 0, "COCOAPI does not support empty polygons"
     rles = mask_util.frPyObjects(polygons, height, width)
     rle = mask_util.merge(rles)
     return mask_util.decode(rle).astype(np.bool)
