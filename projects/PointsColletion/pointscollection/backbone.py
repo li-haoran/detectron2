@@ -95,36 +95,30 @@ class DeformbleOffsetBottleneckBlock(CNNBlockBase):
             offset_channels = 18
 
         self.buffer_offset=nn.Sequential(
-            Conv2d(
+            CoordsConv2d(
+                bottleneck_channels+2,
                 bottleneck_channels,
-                bottleneck_channels,
-                kernel_size=(5,1),
+                kernel_size=3,
                 stride=stride_3x3,
-                padding=(2*dilation,0),
+                padding=1 * dilation,
                 dilation=dilation,
+                norm=get_norm("BN",bottleneck_channels)
             ),
+            nn.ReLU(inplace=True),
             Conv2d(
                 bottleneck_channels,
                 bottleneck_channels,
-                kernel_size=(1,5),
+                kernel_size=(5,5),
                 stride=stride_3x3,
-                padding=(0,2*dilation),
+                padding=(2*dilation,2*dilation),
                 dilation=dilation,
             ),
             nn.ReLU(inplace=True)
 
         )
 
-        # self.conv2_offset = Conv2d(
-        #     bottleneck_channels,
-        #     offset_channels * deform_num_groups,
-        #     kernel_size=3,
-        #     stride=stride_3x3,
-        #     padding=1 * dilation,
-        #     dilation=dilation,
-        # )
-        self.conv2_offset = CoordsConv2d(
-            bottleneck_channels+2,
+        self.conv2_offset = Conv2d(
+            bottleneck_channels,
             offset_channels * deform_num_groups,
             kernel_size=3,
             stride=stride_3x3,
@@ -160,29 +154,6 @@ class DeformbleOffsetBottleneckBlock(CNNBlockBase):
 
         nn.init.constant_(self.conv2_offset.weight, 0)
         nn.init.constant_(self.conv2_offset.bias, 0)
-        # with torch.no_grad():
-        #     pos_shift_w = torch.tensor([x*dilation-dilation for x in range(3)])
-        #     pos_shift_h = torch.tensor([x*dilation-dilation for x in range(3)])
-        #     grid=torch.meshgrid(pos_shift_h,pos_shift_w)
-        #     grid=torch.stack(grid,dim=2).view(-1).to(self.conv2_offset.bias.data.device)
-        #     self.conv2_offset.bias.data[:]=-grid
-
-        #     cw=self.conv2_offset.weight.data.new_zeros(18,2,3,3)
-        #     for h in range(3):
-        #         for w in range(3):
-        #             p=h*3+w
-        #             cw[2*p,0,h,w]=-1
-        #             cw[2*p,0,1,1]=1
-        #             cw[2*p+1,1,h,w]=-1
-        #             cw[2*p+1,1,1,1]=1
-
-        #     cw[8,0,:,:]=-1
-        #     cw[8,0,1,1]=1
-        #     cw[9,1,:,:]=-1
-        #     cw[9,1,1,1]=1
-        #     self.conv2_offset.weight.data[:,-2:,:,:]=cw
-        #     print('custom made initialize weight:{},bias{}'.format(cw,grid))
-
     
     def forward(self, x):
         out = self.conv1(x)
