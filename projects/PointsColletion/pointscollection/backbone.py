@@ -160,6 +160,23 @@ class DeformbleOffsetBottleneckBlock(CNNBlockBase):
 
         nn.init.constant_(self.conv2_offset.weight, 0)
         nn.init.constant_(self.conv2_offset.bias, 0)
+        with torch.no_grad():
+            pos_shift_w = torch.tensor([x*dilation-dilation for x in range(3)])
+            pos_shift_h = torch.tensor([x*dilation-dilation for x in range(3)])
+            grid=torch.meshgrid(pos_shift_h,pos_shift_w)
+            grid=torch.stack(grid,dim=2).view(-1).to(self.conv2_offset.bias.data.device)
+            self.conv2_offset.bias.data[:]=-grid
+
+            cw=self.conv2_offset.weight.data.new_zeros(2,18,3,3)
+            for h in range(3):
+                for w in range(3):
+                    p=h*3+w
+                    cw[:,2*p:2*(p+1),h,w]=-1
+                    cw[:,2*p:2*(p+1),1,1]=1
+            cw[:,8:10,:,:]=-1
+            cw[:,8:10,1,1]=1
+            self.conv2_offset.weight.data[-2:,:,:,:]=cw
+            print('custom made initialize weight:{},bias{}'.format(cw,grid))
 
     
     def forward(self, x):
