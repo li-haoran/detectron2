@@ -8,7 +8,8 @@ SOLVER:
   STEPS: (120000, 160000)
   MAX_ITER: 180000
 INPUT:
+  MIN_SIZE_TRAIN: (640, 672, 704, 736, 768, 800)
   CROP:
-    ENABLED: True
+    ENABLED: False
     TYPE: "relative_range"
     SIZE: [0.95,0.95]
