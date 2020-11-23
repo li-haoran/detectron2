@@ -36,10 +36,10 @@ class CoordsConv2d(Conv2d):
         """
         b, _, h, w = x.size()
 
-        y=torch.arange(h).to(x.device)
-        x=torch.arange(w).to(x.device)
-        yy,xx=torch.meshgrid(y,x)
-        coords=torch.stack([yy,xx],dim=0).unsqueeze(0)
+        dy=torch.arange(h).to(x.device)
+        dx=torch.arange(w).to(x.device)
+        dyy,dxx=torch.meshgrid(dy,dx)
+        coords=torch.stack([dyy,dxx],dim=0).unsqueeze(0)
         coords=coords.repeat(b,1,1,1)
 
         x = torch.cat([
