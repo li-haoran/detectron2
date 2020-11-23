@@ -22,6 +22,42 @@ from detectron2.modeling.backbone.resnet import BasicStem, BottleneckBlock,Defor
 
 __all__ = [ "build_points_collection_resnet_backbone","DeformbleOffsetBottleneckBlock","ResNet2"]
 
+
+
+class CoordsConv2d(Conv2d):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def forward(self, x):
+        """
+        Args:
+            input_tensor: shape(batch, channel, x_dim, y_dim)
+        """
+        b, _, h, w = x.size()
+
+        y=torch.arange(h).to(x.device)
+        x=torch.arange(w).to(x.device)
+        yy,xx=torch.meshgrid(y,x)
+        coords=torch.stack([yy,xx],dim=0).unsqueeze(0)
+        coords=coords.repeat(b,1,1,1)
+
+        x = torch.cat([
+            x,
+            coords], dim=1)
+
+        x = F.conv2d(
+            x, self.weight, self.bias, self.stride, self.padding, self.dilation, self.groups
+        )
+        if self.norm is not None:
+            x = self.norm(x)
+        if self.activation is not None:
+            x = self.activation(x)
+        return x
+
+
+
+
 class DeformbleOffsetBottleneckBlock(CNNBlockBase):
     def __init__(self, in_channels, out_channels, *,bottleneck_channels, stride=1, num_groups=1, norm='BN', stride_in_1x1=False, dilation=1, deform_modulated=False, deform_num_groups=1):
         super().__init__(in_channels, out_channels, stride)
@@ -79,14 +115,24 @@ class DeformbleOffsetBottleneckBlock(CNNBlockBase):
 
         )
 
-        self.conv2_offset = Conv2d(
-            bottleneck_channels,
+        # self.conv2_offset = Conv2d(
+        #     bottleneck_channels,
+        #     offset_channels * deform_num_groups,
+        #     kernel_size=3,
+        #     stride=stride_3x3,
+        #     padding=1 * dilation,
+        #     dilation=dilation,
+        # )
+        self.conv2_offset = CoordsConv2d(
+            bottleneck_channels+2,
             offset_channels * deform_num_groups,
             kernel_size=3,
             stride=stride_3x3,
             padding=1 * dilation,
             dilation=dilation,
         )
+
+
         self.conv2 = deform_conv_op(
             bottleneck_channels,
             bottleneck_channels,
