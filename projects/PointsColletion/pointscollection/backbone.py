@@ -116,6 +116,14 @@ class DeformbleOffsetBottleneckBlock(CNNBlockBase):
             nn.ReLU(inplace=True)
 
         )
+        self.spatial_att=Conv2d(
+                bottleneck_channels,
+                1,
+                kernel_size=(3,3),
+                stride=stride_3x3,
+                padding=(dilation,dilation),
+                dilation=dilation,
+            ),
 
         self.conv2_offset = Conv2d(
             bottleneck_channels,
@@ -161,6 +169,8 @@ class DeformbleOffsetBottleneckBlock(CNNBlockBase):
 
         if self.deform_modulated:
             offset_buffer=self.buffer_offset(out)
+            att=self.spatial_att(out)
+            offset_buffer=offset_buffer*torch.sigmoid(att)
             offset_mask = self.conv2_offset(offset_buffer)
             offset_x, offset_y, mask = torch.chunk(offset_mask, 3, dim=1)
             offset = torch.cat((offset_x, offset_y), dim=1)
@@ -168,6 +178,8 @@ class DeformbleOffsetBottleneckBlock(CNNBlockBase):
             out = self.conv2(out, offset, mask)
         else:
             offset_buffer=self.buffer_offset(out)
+            att=self.spatial_att(out)
+            offset_buffer=offset_buffer*torch.sigmoid(att)
             offset = self.conv2_offset(offset_buffer)
             out = self.conv2(out, offset)
         out = F.relu_(out)
