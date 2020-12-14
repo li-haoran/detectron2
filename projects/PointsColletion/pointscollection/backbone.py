@@ -123,7 +123,7 @@ class DeformbleOffsetBottleneckBlock(CNNBlockBase):
                 stride=stride_3x3,
                 padding=(dilation,dilation),
                 dilation=dilation,
-            ),
+            )
 
         self.conv2_offset = Conv2d(
             bottleneck_channels,
@@ -156,7 +156,7 @@ class DeformbleOffsetBottleneckBlock(CNNBlockBase):
             norm=get_norm(norm, out_channels),
         )
 
-        for layer in [self.conv1, self.conv2, self.conv3, self.shortcut]:
+        for layer in [self.conv1, self.conv2, self.conv3, self.shortcut,self.spatial_att]:
             if layer is not None:  # shortcut can be None
                 weight_init.c2_msra_fill(layer)
 
