@@ -1,0 +1,19 @@
+_BASE_: Base-CoNl-RCNN-FPN.yaml
+MODEL:
+  CONL:
+    STAGES: ['res4']
+    BLOCKS: [[-1,],]
+    RATIO :  1.0/4.0
+    DOWNSAMPLE: False
+    USE_GN: False
+    LR_MULT: None
+    USE_OUT: False
+    USE_BN: False
+    WHITEN_TYPE: ['norm']
+    TEMP :  1.0
+    WITH_GC: False
+    WITH_2FC: False
+    DOUBLE_CONV: False
+    WITH_STATE: True
+    NCLS: 32
+
