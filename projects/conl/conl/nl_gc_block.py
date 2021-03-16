@@ -3,7 +3,6 @@ import torch.nn.functional as F
 from torch import nn
 from torch.nn import init
 import math
-import inplace_abn
 
 eps=1e-5
 class _NonLocalNd_bn(nn.Module):
@@ -37,12 +36,12 @@ class _NonLocalNd_bn(nn.Module):
         if double_conv:
             self.conv_query = nn.Sequential(
                 conv_nd(inplanes, planes, kernel_size=1),
-                inplace_abn.InPlaceABNSync(planes, activation="identity"),
+                nn.BatchNorm2d(planes),
                 nn.ReLU(inplace=False),
                 conv_nd(planes, planes, kernel_size=1))
             self.conv_key = nn.Sequential(
                 conv_nd(inplanes, planes, kernel_size=1),
-                inplace_abn.InPlaceABNSync(planes, activation="identity"),
+                nn.BatchNorm2d(planes),
                 nn.ReLU(inplace=False),
                 conv_nd(planes, planes, kernel_size=1))
         else:

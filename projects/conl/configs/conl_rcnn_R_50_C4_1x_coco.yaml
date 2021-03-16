@@ -1,4 +1,4 @@
-_BASE_: Base-CoNL-RCNN-FPN.yaml
+_BASE_: Base-CoNL-RCNN-C4.yaml
 MODEL:
   CONL:
     STAGES: ['res4']

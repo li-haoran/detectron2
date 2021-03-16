@@ -17,9 +17,9 @@ def add_conl_config(cfg):
     cfg.MODEL.CONL.RATIO = 1.0/4.0
     cfg.MODEL.CONL.DOWNSAMPLE=True
     cfg.MODEL.CONL.USE_GN=False
-    cfg.MODEL.CONL.LR_MULT=None
+    cfg.MODEL.CONL.LR_MULT=0
     cfg.MODEL.CONL.USE_OUT=False
-    cfg.MODEL.CONL.USE_BN=False
+    cfg.MODEL.CONL.OUT_BN=False
     cfg.MODEL.CONL.WHITEN_TYPE=['channel']
     cfg.MODEL.CONL.TEMP = 1.0
     cfg.MODEL.CONL.WITH_GC=False

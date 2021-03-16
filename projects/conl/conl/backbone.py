@@ -16,7 +16,13 @@ from detectron2.layers import (
     ShapeSpec,
     get_norm,
 )
-from detectron2.modeling import BACKBONE_REGISTRY, ResNet,make_stage
+from detectron2.modeling import (
+    BACKBONE_REGISTRY, 
+    ResNet,
+    make_stage,
+    FPN,
+)
+
 from.nl_gc_block import NonLocal2dGc
 
 from functools import partial
@@ -72,11 +78,11 @@ class BasicBlock(CNNBlockBase):
             bias=False,
             norm=get_norm(norm, out_channels),
         )
-
+        self.plugin_flag=False
         if plugin is not None:
             self.plugin_flag=True
-            this_in_planes=out_channels
-            self.plugin=plugin(in_planes=this_in_planes)
+            this_inplanes=out_channels
+            self.plugin=plugin(inplanes=this_inplanes)
 
 
         for layer in [self.conv1, self.conv2, self.shortcut]:
@@ -180,10 +186,11 @@ class BottleneckBlock(CNNBlockBase):
             bias=False,
             norm=get_norm(norm, out_channels),
         )
+        self.plugin_flag=False
         if plugin is not None:
             self.plugin_flag=True
-            this_in_planes=out_channels
-            self.plugin=plugin(in_planes=this_in_planes)
+            this_inplanes=out_channels
+            self.plugin=plugin(inplanes=this_inplanes)
 
         for layer in [self.conv1, self.conv2, self.conv3, self.shortcut]:
             if layer is not None:  # shortcut can be None
@@ -306,10 +313,11 @@ class DeformBottleneckBlock(CNNBlockBase):
             bias=False,
             norm=get_norm(norm, out_channels),
         )
+        self.plugin_flag=False
         if plugin is not None:
             self.plugin_flag=True
-            this_in_planes=out_channels
-            self.plugin=plugin(in_planes=this_in_planes)
+            this_inplanes=out_channels
+            self.plugin=plugin(inplanes=this_inplanes)
         for layer in [self.conv1, self.conv2, self.conv3, self.shortcut]:
             if layer is not None:  # shortcut can be None
                 weight_init.c2_msra_fill(layer)
@@ -412,14 +420,14 @@ def build_conl_resnet_backbone(cfg, input_shape):
 
 
     conl_stages=cfg.MODEL.CONL.STAGES
-    conl_blocks=cfg.MODEL.CONL.BLOCKS=[[-1,],]
+    conl_blocks=cfg.MODEL.CONL.BLOCKS
 
     plugin_config={'ratio': cfg.MODEL.CONL.RATIO,
                     'downsample':   cfg.MODEL.CONL.DOWNSAMPLE,
                     'use_gn':       cfg.MODEL.CONL.USE_GN,
-                    'lr_mult':      cfg.MODEL.CONL.LR_MULT,
+                    'lr_mult':      cfg.MODEL.CONL.LR_MULT if cfg.MODEL.CONL.LR_MULT>0 else None,
                     'use_out':      cfg.MODEL.CONL.USE_OUT,
-                    'use_bn':       cfg.MODEL.CONL.USE_BN,
+                    'out_bn':       cfg.MODEL.CONL.OUT_BN,
                     'whiten_type':  cfg.MODEL.CONL.WHITEN_TYPE,
                     'temp':         cfg.MODEL.CONL.TEMP,
                     'with_gc':      cfg.MODEL.CONL.WITH_GC,
@@ -498,3 +506,40 @@ def build_conl_resnet_backbone(cfg, input_shape):
         bottleneck_channels *= 2
         stages.append(blocks)
     return ResNet(stem, stages, out_features=out_features).freeze(freeze_at)
+
+class LastLevelMaxPool(nn.Module):
+    """
+    This module is used in the original FPN to generate a downsampled
+    P6 feature from P5.
+    """
+
+    def __init__(self):
+        super().__init__()
+        self.num_levels = 1
+        self.in_feature = "p5"
+
+    def forward(self, x):
+        return [F.max_pool2d(x, kernel_size=1, stride=2, padding=0)]
+
+
+@BACKBONE_REGISTRY.register()
+def build_conl_fpn_backbone(cfg, input_shape: ShapeSpec):
+    """
+    Args:
+        cfg: a detectron2 CfgNode
+
+    Returns:
+        backbone (Backbone): backbone module, must be a subclass of :class:`Backbone`.
+    """
+    bottom_up = build_conl_resnet_backbone(cfg, input_shape)
+    in_features = cfg.MODEL.FPN.IN_FEATURES
+    out_channels = cfg.MODEL.FPN.OUT_CHANNELS
+    backbone = FPN(
+        bottom_up=bottom_up,
+        in_features=in_features,
+        out_channels=out_channels,
+        norm=cfg.MODEL.FPN.NORM,
+        top_block=LastLevelMaxPool(),
+        fuse_type=cfg.MODEL.FPN.FUSE_TYPE,
+    )
+    return backbone
