@@ -4,7 +4,6 @@ from torch import nn
 from torch.nn import init
 import math
 
-eps=1e-5
 class _NonLocalNd_bn(nn.Module):
     def __init__(self, dim, inplanes, ratio, downsample, use_gn, lr_mult, use_out, out_bn, whiten_type, temperature, with_gc, with_2fc, double_conv,with_state,Ncls):
         assert dim in [1, 2, 3], "dim {} is not supported yet".format(dim)
@@ -144,10 +143,8 @@ class _NonLocalNd_bn(nn.Module):
             key = self.key_bn(key)
             query = self.query_bn(query)
         if 'norm' in self.whiten_type:       
-            key_norm=torch.norm(key,2,1,True)
-            query_norm=torch.norm(query,2,1,True)
-            key=key/(key_norm+eps)
-            query=query/(query_norm+eps)
+            key=F.normalize(key,p=2,dim=1)
+            query=F.normalize(query,p=2,dim=1)
 
         # [N, T x H x W, T x H' x W']
         sim_map = torch.bmm(query.transpose(1, 2), key)
